@@ -1,0 +1,6 @@
+{
+  "name": "SyncMind AI — Meeting & Workflow Intelligence",
+  "description": "Convert meeting discussions into structured summaries, decisions, assigned tasks, carry-forward workflows, and knowledge handovers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,39 @@
+1
+00:00:00,000 --> 00:00:06,000
+Welcome to SyncMind AI — the Meeting and Workflow Intelligence Platform.
+
+2
+00:00:06,000 --> 00:00:12,000
+Out of the box, the Q4 Business Operations Review scenario loads with two meetings and five tracked tasks.
+
+3
+00:00:12,000 --> 00:00:19,000
+In Meeting Management, each session preserves its participants, agenda, notes, and verbatim transcript.
+
+4
+00:00:19,000 --> 00:00:25,000
+Let's open Part 2 of our Q4 Operations Review and launch the AI Meeting Assistant.
+
+5
+00:00:25,000 --> 00:00:35,000
+Our server-side Gemini extractor generates a structured summary, formal decisions, action items, and blockers.
+
+6
+00:00:35,000 --> 00:00:45,000
+Missing owners or deadlines are strictly flagged as Unassigned or Unspecified for human review before saving.
+
+7
+00:00:45,000 --> 00:00:58,000
+In Action Items, we mark Priya Nair's EMEA onboarding runbook task as Completed, logging a permanent audit entry.
+
+8
+00:00:58,000 --> 00:01:06,000
+In Carry-Forward, we move Marcus Vance's overdue Stripe webhook migration from Part 1 into Part 2 while preserving its original source.
+
+9
+00:01:06,000 --> 00:01:12,000
+In Work Handover, the receiving owner acknowledges project context, blockers, and next steps.
+
+10
+00:01:12,000 --> 00:01:25,000
+Finally, the Weekly Report recalculates live completion rates and generates an exportable AI executive narrative.
