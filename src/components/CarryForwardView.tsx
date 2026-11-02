@@ -24,7 +24,6 @@ export const CarryForwardView: React.FC<CarryForwardViewProps> = ({
   state,
   onCarryForwardTask,
 }) => {
-  // Default target meeting is the latest meeting (mtg-q4-ops-2)
   const defaultTargetId =
     state.meetings.find((m) => m.id === 'mtg-q4-ops-2')?.id || state.meetings[0]?.id || '';
 
@@ -34,7 +33,6 @@ export const CarryForwardView: React.FC<CarryForwardViewProps> = ({
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
 
-  // Unfinished tasks from any meeting
   const unfinishedTasks = state.tasks.filter((t) => t.status !== 'completed');
 
   const handleCarry = async (taskId: string) => {
@@ -61,15 +59,17 @@ export const CarryForwardView: React.FC<CarryForwardViewProps> = ({
   return (
     <div className="space-y-6" data-testid="carry-forward-view">
       {/* Top Explanation & Target Selector */}
-      <div className="bg-white border border-slate-200 rounded-lg p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-2xs">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">
+          <span className="text-xs font-mono uppercase tracking-wider text-indigo-600 font-semibold">
+            Meeting-to-Meeting Continuity
+          </span>
+          <h2 className="text-lg font-bold text-slate-900 mt-0.5">
             Carry-Forward Accountability Engine
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Identify unfinished tasks from previous meetings and carry them into subsequent sessions
-            without losing their original source meeting or status history. Duplicate carry-forwards
-            are automatically blocked.
+            Carry unfinished tasks from previous meetings into subsequent sessions without losing
+            their original source meeting or status history. Duplicate carry-forwards are blocked.
           </p>
         </div>
 
@@ -88,7 +88,7 @@ export const CarryForwardView: React.FC<CarryForwardViewProps> = ({
               setErrorMsg(null);
               setSuccessMsg(null);
             }}
-            className="px-3 py-2 text-xs font-medium border border-slate-300 rounded-md bg-white text-slate-900"
+            className="px-3 py-2 text-xs font-medium border border-slate-300 rounded-lg bg-white text-slate-900"
           >
             {state.meetings.map((m) => (
               <option key={m.id} value={m.id}>
@@ -101,7 +101,7 @@ export const CarryForwardView: React.FC<CarryForwardViewProps> = ({
 
       {errorMsg && (
         <div
-          className="p-4 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700"
+          className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700"
           data-testid="carry-forward-error"
         >
           {errorMsg}
@@ -110,7 +110,7 @@ export const CarryForwardView: React.FC<CarryForwardViewProps> = ({
 
       {successMsg && (
         <div
-          className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2"
+          className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2"
           data-testid="carry-forward-success"
         >
           <Check className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -121,7 +121,7 @@ export const CarryForwardView: React.FC<CarryForwardViewProps> = ({
       {/* Split Layout: Unfinished Candidate Queue (7 cols) + Carry-Forward Audit Ledger (5 cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Candidate Queue */}
-        <div className="lg:col-span-7 bg-white border border-slate-200 rounded-lg divide-y divide-slate-200">
+        <div className="lg:col-span-7 bg-white border border-slate-200 rounded-xl divide-y divide-slate-200 shadow-2xs overflow-hidden">
           <div className="px-5 py-4 bg-slate-50 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold text-slate-900">
@@ -147,7 +147,7 @@ export const CarryForwardView: React.FC<CarryForwardViewProps> = ({
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 text-xs">
                       {isOverdue ? (
-                        <span className="text-red-700 font-semibold inline-flex items-center gap-1">
+                        <span className="text-red-600 font-semibold inline-flex items-center gap-1">
                           <AlertTriangle className="w-3.5 h-3.5" />
                           Overdue
                         </span>
@@ -180,14 +180,14 @@ export const CarryForwardView: React.FC<CarryForwardViewProps> = ({
                 </div>
 
                 {/* Source Lineage Strip */}
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded text-xs space-y-1">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1">
                   <div className="flex items-center gap-1.5 text-slate-600">
                     <GitCommitHorizontal className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <span>Original Source Meeting:</span>
                     <strong className="text-slate-900">{task.sourceMeetingTitle}</strong>
                   </div>
                   <div className="flex items-center gap-1.5 text-slate-600">
-                    <CornerDownRight className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <CornerDownRight className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                     <span>Currently Tracked In:</span>
                     <strong className="text-slate-900">{task.currentMeetingTitle}</strong>
                   </div>
@@ -204,7 +204,7 @@ export const CarryForwardView: React.FC<CarryForwardViewProps> = ({
                     }
                     placeholder="Optional carry-forward reason / context note..."
                     disabled={alreadyInTarget}
-                    className="flex-1 px-3 py-1.5 text-xs border border-slate-300 rounded-md disabled:bg-slate-100"
+                    className="flex-1 px-3 py-1.5 text-xs border border-slate-300 rounded-lg disabled:bg-slate-100"
                   />
 
                   <button
@@ -212,10 +212,10 @@ export const CarryForwardView: React.FC<CarryForwardViewProps> = ({
                     disabled={alreadyInTarget || busyTaskId === task.id}
                     onClick={() => handleCarry(task.id)}
                     data-testid={`carry-btn-${task.id}`}
-                    className={`px-3.5 py-1.5 text-xs font-medium rounded-md transition-colors inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                    className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
                       alreadyInTarget
                         ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
                     }`}
                   >
                     {alreadyInTarget ? (
@@ -237,7 +237,7 @@ export const CarryForwardView: React.FC<CarryForwardViewProps> = ({
         </div>
 
         {/* Carry-Forward Audit Ledger */}
-        <div className="lg:col-span-5 bg-white border border-slate-200 rounded-lg divide-y divide-slate-200">
+        <div className="lg:col-span-5 bg-white border border-slate-200 rounded-xl divide-y divide-slate-200 shadow-2xs overflow-hidden">
           <div className="px-5 py-4 bg-slate-50 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold text-slate-900">
@@ -248,7 +248,7 @@ export const CarryForwardView: React.FC<CarryForwardViewProps> = ({
               </p>
             </div>
             <span
-              className="text-xs font-mono tabular-nums font-semibold text-blue-700"
+              className="text-xs font-mono tabular-nums font-semibold text-indigo-700"
               data-testid="carry-forward-count"
             >
               {state.carryForwardHistory.length} recorded
@@ -264,14 +264,14 @@ export const CarryForwardView: React.FC<CarryForwardViewProps> = ({
                 </span>
               </div>
               <p className="text-sm font-semibold text-slate-900">{cf.taskTitle}</p>
-              <div className="space-y-1 text-slate-600 bg-slate-50 p-2.5 rounded border border-slate-200">
+              <div className="space-y-1 text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                 <div>
                   <span className="text-slate-500">Original Source: </span>
                   <span className="font-medium text-slate-800">{cf.originalMeetingTitle}</span>
                 </div>
                 <div>
                   <span className="text-slate-500">Carried Into: </span>
-                  <span className="font-medium text-blue-700">{cf.toMeetingTitle}</span>
+                  <span className="font-medium text-indigo-700">{cf.toMeetingTitle}</span>
                 </div>
                 <div>
                   <span className="text-slate-500">Reason: </span>

@@ -904,3 +904,192 @@ export function calculateWeeklyReport(state: AppDatabaseState): WeeklyReportData
 export function resetToDemoState(): AppDatabaseState {
   return createInitialSeedState();
 }
+
+export interface CopilotTurnResponse {
+  reply: string;
+  executedAction?: string | null;
+  state: AppDatabaseState;
+  sourceEngine: 'gemini' | 'deterministic-fallback';
+}
+
+/**
+ * Deterministic Business AI Copilot engine that can inspect live meetings, tasks, blockers,
+ * decisions, and handovers AND execute mutations (complete task, carry-forward, create task, acknowledge handover).
+ */
+export function executeCopilotTurn(
+  state: AppDatabaseState,
+  userMessage: string
+): CopilotTurnResponse {
+  const msg = userMessage.trim();
+  const lower = msg.toLowerCase();
+  let nextState = state;
+  let executedAction: string | null = null;
+
+  // 1. Check if user wants to COMPLETE a task
+  if (/\b(complete|mark\s+.*complete|close|finish)\b/i.test(lower)) {
+    const openTasks = nextState.tasks.filter((t) => t.status !== 'completed');
+    const matchedTask =
+      openTasks.find(
+        (t) =>
+          (lower.includes('priya') && t.owner.toLowerCase().includes('priya')) ||
+          (lower.includes('rohan') && t.owner.toLowerCase().includes('rohan')) ||
+          (lower.includes('ananya') && t.owner.toLowerCase().includes('ananya')) ||
+          (lower.includes('runbook') && t.title.toLowerCase().includes('runbook')) ||
+          (lower.includes('langchain') && t.title.toLowerCase().includes('langchain')) ||
+          (lower.includes('sla') && t.title.toLowerCase().includes('sla'))
+      ) || openTasks[0];
+
+    if (matchedTask) {
+      nextState = updateTaskStatus(
+        nextState,
+        matchedTask.id,
+        'completed',
+        'Marked completed via PwC Business AI Copilot.'
+      );
+      executedAction = `Completed Task: "${matchedTask.title}" (${matchedTask.owner})`;
+      const metrics = calculateDashboardMetrics(nextState);
+      return {
+        reply: `Done! I marked **"${matchedTask.title}"** (assigned to ${matchedTask.owner}) as **Completed** in the live database. Your overall completion rate is now **${metrics.completionRate}%** (${metrics.completedTasks} of ${metrics.totalTasks} tasks completed, ${metrics.overdueTasks} overdue remaining).`,
+        executedAction,
+        state: nextState,
+        sourceEngine: 'deterministic-fallback',
+      };
+    }
+  }
+
+  // 2. Check if user wants to CARRY FORWARD an overdue/unfinished task
+  if (/\b(carry\s*forward|carry-forward|move.*next\s+meeting|carry.*part\s*2)\b/i.test(lower)) {
+    const targetMtg =
+      nextState.meetings.find((m) => m.id === 'mtg-q4-ops-2') || nextState.meetings[0];
+    const candidate =
+      nextState.tasks.find(
+        (t) =>
+          t.status !== 'completed' &&
+          t.currentMeetingId !== targetMtg.id &&
+          ((lower.includes('rohan') && t.owner.toLowerCase().includes('rohan')) ||
+            (lower.includes('ananya') && t.owner.toLowerCase().includes('ananya')) ||
+            t.status === 'overdue')
+      ) ||
+      nextState.tasks.find(
+        (t) => t.status !== 'completed' && t.currentMeetingId !== targetMtg.id
+      );
+
+    if (candidate && targetMtg) {
+      try {
+        nextState = carryForwardTask(
+          nextState,
+          candidate.id,
+          targetMtg.id,
+          'Carried forward via PwC Business AI Copilot.'
+        );
+        executedAction = `Carried Forward: "${candidate.title}" → ${targetMtg.title}`;
+        return {
+          reply: `I have carried forward **"${candidate.title}"** (Owner: ${candidate.owner}) into **${targetMtg.title}** while preserving its original source lineage from *${candidate.sourceMeetingTitle}*.`,
+          executedAction,
+          state: nextState,
+          sourceEngine: 'deterministic-fallback',
+        };
+      } catch (err) {
+        return {
+          reply:
+            err instanceof Error
+              ? err.message
+              : 'That task has already been carried forward into the target meeting.',
+          executedAction: null,
+          state: nextState,
+          sourceEngine: 'deterministic-fallback',
+        };
+      }
+    }
+  }
+
+  // 3. Check if user wants to CREATE / ADD a new task
+  if (/\b(create\s+(?:a\s+)?(?:high\s+priority\s+)?task|add\s+(?:a\s+)?task|assign\s+(?:a\s+)?task)\b/i.test(lower)) {
+    const owner = lower.includes('ananya')
+      ? 'Ananya Sharma'
+      : lower.includes('rohan')
+      ? 'Rohan Deshmukh'
+      : lower.includes('priya')
+      ? 'Priya Nair'
+      : 'Rohan Deshmukh';
+    const priority: TaskPriority = lower.includes('high')
+      ? 'High'
+      : lower.includes('low')
+      ? 'Low'
+      : 'Medium';
+    const dateMatch = msg.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+    const deadline = dateMatch ? dateMatch[1] : '2026-11-07';
+
+    // Extract title after "to " or ":"
+    const titleMatch =
+      msg.match(/(?:to|titled|:)\s+["']?([^"'.]+)["']?/i) ||
+      msg.match(/task\s+for\s+[A-Za-z\s]+\s+to\s+(.+)/i);
+    const rawTitle = titleMatch
+      ? titleMatch[1].replace(/\s+by\s+\d{4}-\d{2}-\d{2}/i, '').trim()
+      : 'Prepare PwC India GenAI model risk & FinOps steering briefing';
+    const cleanTitle = rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1);
+    const targetMtgId = nextState.meetings[1]?.id || nextState.meetings[0]?.id || 'mtg-q4-ops-2';
+
+    nextState = createTask(nextState, {
+      title: cleanTitle,
+      description: `${cleanTitle} (Created via PwC Business AI Copilot)`,
+      owner,
+      priority,
+      deadline,
+      sourceMeetingId: targetMtgId,
+    });
+    executedAction = `Created Task: "${cleanTitle}" (${owner} · ${priority})`;
+    return {
+      reply: `Created new **${priority} Priority** action item **"${cleanTitle}"** assigned to **${owner}** (Due: \`${deadline}\`) under the active PwC India Business AI Review meeting.`,
+      executedAction,
+      state: nextState,
+      sourceEngine: 'deterministic-fallback',
+    };
+  }
+
+  // 4. Analytical Q&A over live workspace state
+  const metrics = calculateDashboardMetrics(nextState);
+  const overdueList = nextState.tasks
+    .filter((t) => t.status === 'overdue')
+    .map((t) => `• **${t.title}** — Owner: ${t.owner} (Due: ${t.deadline})`);
+  const blockerList = nextState.blockers.map(
+    (b) => `• **[${b.severity}]** ${b.description} (Owner: ${b.owner})`
+  );
+
+  if (/\b(overdue|late|slipped|blocker|risk)\b/i.test(lower)) {
+    return {
+      reply: `Here is the current risk & overdue summary for **${nextState.scenarioName}**:\n\n**Overdue Action Items (${overdueList.length}):**\n${
+        overdueList.length > 0 ? overdueList.join('\n') : '• Zero overdue tasks!'
+      }\n\n**Active Escalated Blockers (${blockerList.length}):**\n${
+        blockerList.length > 0 ? blockerList.join('\n') : '• No active blockers.'
+      }\n\nYou can ask me to *"Carry forward Rohan's overdue task into Part 2"* or *"Mark Priya's runbook task complete"* anytime.`,
+      executedAction: null,
+      state: nextState,
+      sourceEngine: 'deterministic-fallback',
+    };
+  }
+
+  if (/\b(team|owner|who|workload|ananya|rohan|priya)\b/i.test(lower)) {
+    const report = calculateWeeklyReport(nextState);
+    const ownerLines = report.byOwner.map(
+      (o) =>
+        `• **${o.owner}**: ${o.completed} completed, ${o.pending} pending, ${o.overdue} overdue (${o.completionRate}% completion)`
+    );
+    return {
+      reply: `**PwC India Business AI Team Workload Breakdown:**\n\n${ownerLines.join(
+        '\n'
+      )}\n\nAcross ${metrics.totalMeetings} meetings, the practice has locked in **${metrics.totalDecisions} formal decisions** and maintains **${metrics.totalHandovers} active knowledge handover(s)**.`,
+      executedAction: null,
+      state: nextState,
+      sourceEngine: 'deterministic-fallback',
+    };
+  }
+
+  return {
+    reply: `**PwC India Business AI Workspace Status:**\n• **Completion Rate:** ${metrics.completionRate}% (${metrics.completedTasks} completed, ${metrics.pendingTasks} pending, ${metrics.overdueTasks} overdue of ${metrics.totalTasks} tasks)\n• **Decisions & Blockers:** ${metrics.totalDecisions} formal decisions logged · ${metrics.activeBlockers} active blocker(s)\n• **Carried-Forward Lineage:** ${metrics.carriedForwardCount} task(s) carried across sessions\n\nTry asking me to:\n1. *"Show overdue tasks and DPDP compliance blockers"*\n2. *"Mark Priya Nair's compliance runbook task complete"*\n3. *"Carry forward Rohan's overdue LangChain task into Part 2"*`,
+    executedAction: null,
+    state: nextState,
+    sourceEngine: 'deterministic-fallback',
+  };
+}
+

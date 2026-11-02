@@ -3,9 +3,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
+  Columns3,
   CornerDownRight,
   Edit3,
   History,
+  List,
   Plus,
   Search,
   Trash2,
@@ -41,6 +43,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
   onToggleTaskStatus,
   onDeleteTask,
 }) => {
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | TaskStatus>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | TaskPriority>('all');
@@ -52,12 +55,15 @@ export const TasksView: React.FC<TasksViewProps> = ({
   const [editingTask, setEditingTask] = useState<ActionItem | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [owner, setOwner] = useState('Elena Rostova');
+  const [owner, setOwner] = useState('Ananya Sharma');
   const [priority, setPriority] = useState<TaskPriority>('High');
   const [deadline, setDeadline] = useState('2026-11-06');
   const [sourceMeetingId, setSourceMeetingId] = useState(state.meetings[0]?.id || '');
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Slide-over Task Detail Drawer & Delete Confirmation State
   const [historyTask, setHistoryTask] = useState<ActionItem | null>(null);
+  const [confirmDeleteTaskId, setConfirmDeleteTaskId] = useState<string | null>(null);
 
   const ownersList = useMemo(() => {
     const set = new Set<string>(state.participants.map((p) => p.name));
@@ -92,7 +98,6 @@ export const TasksView: React.FC<TasksViewProps> = ({
         if (sortBy === 'status') {
           return statusRank[a.status] - statusRank[b.status];
         }
-        // Sort by deadline ascending (Unspecified at bottom)
         const da = a.deadline === 'Unspecified' ? '9999-12-31' : a.deadline;
         const db = b.deadline === 'Unspecified' ? '9999-12-31' : b.deadline;
         return da.localeCompare(db);
@@ -103,7 +108,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
     setEditingTask(null);
     setTitle('');
     setDescription('');
-    setOwner('Elena Rostova');
+    setOwner('Ananya Sharma');
     setPriority('High');
     setDeadline('2026-11-06');
     setSourceMeetingId(state.meetings[0]?.id || '');
@@ -160,29 +165,75 @@ export const TasksView: React.FC<TasksViewProps> = ({
   const pendingCount = state.tasks.filter((t) => t.status === 'pending').length;
   const completedCount = state.tasks.filter((t) => t.status === 'completed').length;
 
+  // Keep drawer synced with updated state
+  const activeDrawerTask = historyTask
+    ? state.tasks.find((t) => t.id === historyTask.id) || historyTask
+    : null;
+
   return (
     <div className="space-y-6" data-testid="tasks-view">
       {/* Header & Action Bar */}
-      <div className="bg-white border border-slate-200 rounded-lg p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">Action Item &amp; Task Ledger</h2>
+          <span className="text-xs font-mono uppercase tracking-wider text-indigo-600 font-semibold">
+            Action Item Management
+          </span>
+          <h2 className="text-lg font-bold text-slate-900 mt-0.5">
+            Action Item Ledger &amp; Kanban Workspace
+          </h2>
           <p className="text-xs text-slate-500 mt-0.5">
             Track ownership, priority, deadlines, source meeting lineage, and status audit trails
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={openCreateModal}
-          className="px-4 py-2 text-xs font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          New Action Item
-        </button>
+        <div className="flex items-center gap-2.5 shrink-0">
+          {/* View Toggle: List vs Kanban */}
+          <div
+            className="inline-flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200"
+            role="group"
+            aria-label="Toggle task view mode"
+          >
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              data-testid="tasks-view-mode-list"
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+                viewMode === 'list'
+                  ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <List className="w-3.5 h-3.5" />
+              List View
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('kanban')}
+              data-testid="tasks-view-mode-kanban"
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+                viewMode === 'kanban'
+                  ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Columns3 className="w-3.5 h-3.5" />
+              Kanban Board
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            New Action Item
+          </button>
+        </div>
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="bg-white border border-slate-200 rounded-lg p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-2xs">
         {/* Interactive Status Segmented Control */}
         <div
           className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg overflow-x-auto"
@@ -192,9 +243,9 @@ export const TasksView: React.FC<TasksViewProps> = ({
           <button
             type="button"
             onClick={() => setStatusFilter('all')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               statusFilter === 'all'
-                ? 'bg-white text-slate-900 shadow-xs'
+                ? 'bg-white text-slate-900 shadow-2xs font-semibold'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -203,9 +254,9 @@ export const TasksView: React.FC<TasksViewProps> = ({
           <button
             type="button"
             onClick={() => setStatusFilter('overdue')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               statusFilter === 'overdue'
-                ? 'bg-white text-red-700 shadow-xs'
+                ? 'bg-white text-red-600 shadow-2xs font-semibold'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -214,9 +265,9 @@ export const TasksView: React.FC<TasksViewProps> = ({
           <button
             type="button"
             onClick={() => setStatusFilter('pending')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               statusFilter === 'pending'
-                ? 'bg-white text-amber-700 shadow-xs'
+                ? 'bg-white text-amber-700 shadow-2xs font-semibold'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -225,9 +276,9 @@ export const TasksView: React.FC<TasksViewProps> = ({
           <button
             type="button"
             onClick={() => setStatusFilter('completed')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               statusFilter === 'completed'
-                ? 'bg-white text-emerald-700 shadow-xs'
+                ? 'bg-white text-emerald-700 shadow-2xs font-semibold'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -236,7 +287,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
         </div>
 
         {/* Search + Dropdown Filters */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <div className="relative flex-1 sm:w-60">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -245,7 +296,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search tasks, owners, meetings..."
-              className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600"
+              className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
             />
           </div>
 
@@ -253,7 +304,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
             aria-label="Filter by priority"
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value as 'all' | TaskPriority)}
-            className="px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white"
+            className="px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
           >
             <option value="all">All Priorities</option>
             <option value="High">High Priority</option>
@@ -265,7 +316,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
             aria-label="Filter by owner"
             value={ownerFilter}
             onChange={(e) => setOwnerFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white"
+            className="px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
           >
             <option value="all">All Owners</option>
             {ownersList.map((o) => (
@@ -279,7 +330,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
             aria-label="Sort tasks by"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as 'deadline' | 'priority' | 'status')}
-            className="px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white"
+            className="px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
           >
             <option value="deadline">Sort: Deadline</option>
             <option value="priority">Sort: Priority</option>
@@ -288,200 +339,355 @@ export const TasksView: React.FC<TasksViewProps> = ({
         </div>
       </div>
 
-      {/* High-Density Data Table */}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600">
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Action Item &amp; Source Lineage</th>
-                <th className="py-3 px-4">Owner</th>
-                <th className="py-3 px-4">Priority</th>
-                <th className="py-3 px-4 text-right">Deadline</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 text-sm">
-              {filteredTasks.map((task) => {
-                const isCompleted = task.status === 'completed';
-                const isOverdue = task.status === 'overdue';
-                const isCarried = task.carriedFromMeetingIds.length > 0;
+      {/* Delete Confirmation Alert */}
+      {confirmDeleteTaskId && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="text-xs text-red-900">
+            <strong>Confirm deletion:</strong> Are you sure you want to permanently remove this
+            action item?
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={async () => {
+                await onDeleteTask(confirmDeleteTaskId);
+                if (historyTask?.id === confirmDeleteTaskId) {
+                  setHistoryTask(null);
+                }
+                setConfirmDeleteTaskId(null);
+              }}
+              className="px-3 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg cursor-pointer"
+            >
+              Confirm Delete
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDeleteTaskId(null)}
+              className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
-                return (
-                  <tr
-                    key={task.id}
-                    className={`hover:bg-slate-50/80 transition-colors ${
-                      isOverdue ? 'bg-red-50/20' : ''
-                    }`}
-                  >
-                    <td className="py-3.5 px-4 align-top whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onToggleTaskStatus(task.id, isCompleted ? 'pending' : 'completed')
-                        }
-                        aria-label={
-                          isCompleted
-                            ? `Reopen "${task.title}"`
-                            : `Complete "${task.title}"`
-                        }
-                        className="inline-flex items-center gap-1.5 text-xs font-medium group"
-                      >
-                        {isCompleted ? (
-                          <>
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                            <span className="text-emerald-700 group-hover:underline">
-                              Completed
-                            </span>
-                          </>
-                        ) : isOverdue ? (
-                          <>
-                            <AlertTriangle className="w-4 h-4 text-red-600" />
-                            <span className="text-red-700 font-semibold group-hover:underline">
-                              Overdue
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <Clock className="w-4 h-4 text-amber-600" />
-                            <span className="text-amber-700 group-hover:underline">Pending</span>
-                          </>
-                        )}
-                      </button>
-                    </td>
+      {/* VIEW MODE 1: High-Density Data Table */}
+      {viewMode === 'list' ? (
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600">
+                  <th className="py-3.5 px-4">Status</th>
+                  <th className="py-3.5 px-4">Action Item &amp; Source Lineage</th>
+                  <th className="py-3.5 px-4">Owner</th>
+                  <th className="py-3.5 px-4">Priority</th>
+                  <th className="py-3.5 px-4 text-right">Deadline</th>
+                  <th className="py-3.5 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 text-sm">
+                {filteredTasks.map((task) => {
+                  const isCompleted = task.status === 'completed';
+                  const isOverdue = task.status === 'overdue';
+                  const isCarried = task.carriedFromMeetingIds.length > 0;
 
-                    <td className="py-3.5 px-4 align-top">
-                      <div
-                        className={`font-medium ${
-                          isCompleted ? 'line-through text-slate-400' : 'text-slate-900'
-                        }`}
-                      >
-                        {task.title}
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5">{task.description}</p>
-                      <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                        <span>Origin: {task.sourceMeetingTitle}</span>
-                        {isCarried && (
-                          <>
-                            <span aria-hidden="true">·</span>
-                            <span className="text-blue-700 font-medium inline-flex items-center gap-1">
-                              <CornerDownRight className="w-3 h-3" />
-                              Carried to: {task.currentMeetingTitle}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </td>
-
-                    <td className="py-3.5 px-4 align-top whitespace-nowrap">
-                      <div className="flex items-center gap-2 text-xs">
-                        <ParticipantAvatar
-                          name={task.owner}
-                          participants={state.participants}
-                          size="sm"
-                        />
-                        <span
-                          className={
-                            task.owner === 'Unassigned'
-                              ? 'text-amber-700 font-medium'
-                              : 'text-slate-900 font-medium'
+                  return (
+                    <tr
+                      key={task.id}
+                      className={`hover:bg-slate-50/80 transition-colors ${
+                        isOverdue ? 'bg-red-50/20' : ''
+                      }`}
+                    >
+                      <td className="py-3.5 px-4 align-top whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onToggleTaskStatus(task.id, isCompleted ? 'pending' : 'completed')
                           }
+                          aria-label={
+                            isCompleted
+                              ? `Reopen "${task.title}"`
+                              : `Complete "${task.title}"`
+                          }
+                          className="inline-flex items-center gap-1.5 text-xs font-medium group cursor-pointer"
                         >
-                          {task.owner}
-                        </span>
-                      </div>
-                    </td>
+                          {isCompleted ? (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                              <span className="text-emerald-700 group-hover:underline">
+                                Completed
+                              </span>
+                            </>
+                          ) : isOverdue ? (
+                            <>
+                              <AlertTriangle className="w-4 h-4 text-red-600" />
+                              <span className="text-red-600 font-semibold group-hover:underline">
+                                Overdue
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="w-4 h-4 text-amber-600" />
+                              <span className="text-amber-700 group-hover:underline">Pending</span>
+                            </>
+                          )}
+                        </button>
+                      </td>
 
-                    <td className="py-3.5 px-4 align-top whitespace-nowrap text-xs">
-                      <span
-                        className={
-                          task.priority === 'High'
-                            ? 'text-red-700 font-semibold'
-                            : task.priority === 'Medium'
-                            ? 'text-slate-800 font-medium'
-                            : 'text-slate-500'
-                        }
-                      >
-                        {task.priority}
-                      </span>
-                    </td>
-
-                    <td className="py-3.5 px-4 align-top whitespace-nowrap text-right font-mono tabular-nums text-xs">
-                      <span
-                        className={
-                          isOverdue
-                            ? 'text-red-700 font-semibold'
-                            : task.deadline === 'Unspecified'
-                            ? 'text-slate-400'
-                            : 'text-slate-700'
-                        }
-                      >
-                        {task.deadline}
-                      </span>
-                    </td>
-
-                    <td className="py-3.5 px-4 align-top whitespace-nowrap text-right">
-                      <div className="inline-flex items-center gap-1">
+                      <td className="py-3.5 px-4 align-top">
                         <button
                           type="button"
                           onClick={() => setHistoryTask(task)}
-                          aria-label={`View status history for ${task.title}`}
-                          title="Status History"
-                          className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                          className={`text-left font-medium hover:text-indigo-600 transition-colors cursor-pointer ${
+                            isCompleted ? 'line-through text-slate-400' : 'text-slate-900'
+                          }`}
                         >
-                          <History className="w-4 h-4" />
+                          {task.title}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(task)}
-                          aria-label={`Edit ${task.title}`}
-                          title="Edit Task"
-                          className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded"
+                        <p className="text-xs text-slate-500 mt-0.5">{task.description}</p>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                          <span>Origin: {task.sourceMeetingTitle}</span>
+                          {isCarried && (
+                            <>
+                              <span aria-hidden="true">·</span>
+                              <span className="text-indigo-600 font-medium inline-flex items-center gap-1">
+                                <CornerDownRight className="w-3 h-3" />
+                                Carried to: {task.currentMeetingTitle}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </td>
+
+                      <td className="py-3.5 px-4 align-top whitespace-nowrap">
+                        <div className="flex items-center gap-2 text-xs">
+                          <ParticipantAvatar
+                            name={task.owner}
+                            participants={state.participants}
+                            size="sm"
+                          />
+                          <span
+                            className={
+                              task.owner === 'Unassigned'
+                                ? 'text-amber-700 font-medium'
+                                : 'text-slate-900 font-medium'
+                            }
+                          >
+                            {task.owner}
+                          </span>
+                        </div>
+                      </td>
+
+                      <td className="py-3.5 px-4 align-top whitespace-nowrap text-xs">
+                        <span
+                          className={
+                            task.priority === 'High'
+                              ? 'text-red-600 font-semibold'
+                              : task.priority === 'Medium'
+                              ? 'text-slate-800 font-medium'
+                              : 'text-slate-500'
+                          }
                         >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDeleteTask(task.id)}
-                          aria-label={`Delete ${task.title}`}
-                          title="Delete Task"
-                          className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded"
+                          {task.priority}
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 px-4 align-top whitespace-nowrap text-right font-mono tabular-nums text-xs">
+                        <span
+                          className={
+                            isOverdue
+                              ? 'text-red-600 font-semibold'
+                              : task.deadline === 'Unspecified'
+                              ? 'text-slate-400'
+                              : 'text-slate-700'
+                          }
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                          {task.deadline}
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 px-4 align-top whitespace-nowrap text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setHistoryTask(task)}
+                            aria-label={`View status history for ${task.title}`}
+                            title="Task Details & Lineage"
+                            className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded cursor-pointer"
+                          >
+                            <History className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(task)}
+                            aria-label={`Edit ${task.title}`}
+                            title="Edit Task"
+                            className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded cursor-pointer"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteTaskId(task.id)}
+                            aria-label={`Delete ${task.title}`}
+                            title="Delete Task"
+                            className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+
+                {filteredTasks.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center">
+                      <p className="text-sm font-medium text-slate-900">
+                        No matching action items found
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Adjust your search query or filters, or create a new action item.
+                      </p>
                     </td>
                   </tr>
-                );
-              })}
-
-              {filteredTasks.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center">
-                    <p className="text-sm font-medium text-slate-900">
-                      No matching action items found
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Adjust your search query or filters, or create a new action item.
-                    </p>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      ) : (
+        /* VIEW MODE 2: Enterprise Kanban Board */
+        <div
+          className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+          data-testid="tasks-kanban-board"
+        >
+          {(
+            [
+              {
+                status: 'overdue' as TaskStatus,
+                label: 'Overdue & Escalated',
+                accent: 'border-t-4 border-t-red-600',
+                badge: 'text-red-700 bg-red-50',
+              },
+              {
+                status: 'pending' as TaskStatus,
+                label: 'In Progress / Scheduled',
+                accent: 'border-t-4 border-t-indigo-600',
+                badge: 'text-indigo-700 bg-indigo-50',
+              },
+              {
+                status: 'completed' as TaskStatus,
+                label: 'Completed & Verified',
+                accent: 'border-t-4 border-t-emerald-600',
+                badge: 'text-emerald-700 bg-emerald-50',
+              },
+            ] as const
+          ).map((col) => {
+            const colTasks = filteredTasks.filter((t) => t.status === col.status);
+            return (
+              <div
+                key={col.status}
+                className={`bg-white border border-slate-200 rounded-xl ${col.accent} p-4 space-y-3 shadow-2xs`}
+              >
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <span className="text-xs font-bold text-slate-900">{col.label}</span>
+                  <span
+                    className={`px-2 py-0.5 rounded text-xs font-mono font-semibold ${col.badge}`}
+                  >
+                    {colTasks.length}
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {colTasks.map((task) => {
+                    const isCompleted = task.status === 'completed';
+                    return (
+                      <div
+                        key={task.id}
+                        className="p-3.5 rounded-xl bg-slate-50/70 border border-slate-200 hover:border-indigo-300 transition-all space-y-2.5"
+                      >
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span
+                            className={`font-semibold ${
+                              task.priority === 'High'
+                                ? 'text-red-600'
+                                : task.priority === 'Medium'
+                                ? 'text-indigo-700'
+                                : 'text-slate-500'
+                            }`}
+                          >
+                            {task.priority} Priority
+                          </span>
+                          <span className="font-mono text-slate-500">Due {task.deadline}</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setHistoryTask(task)}
+                          className="text-left text-xs font-semibold text-slate-900 hover:text-indigo-600 block cursor-pointer"
+                        >
+                          {task.title}
+                        </button>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-200/70">
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <ParticipantAvatar
+                              name={task.owner}
+                              participants={state.participants}
+                              size="sm"
+                            />
+                            <span className="text-slate-700 font-medium truncate max-w-[120px]">
+                              {task.owner}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setHistoryTask(task)}
+                              className="px-2 py-1 text-[11px] font-medium text-slate-600 hover:text-indigo-600 bg-white border border-slate-200 rounded cursor-pointer"
+                            >
+                              Details
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onToggleTaskStatus(task.id, isCompleted ? 'pending' : 'completed')
+                              }
+                              className="px-2 py-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded cursor-pointer"
+                            >
+                              {isCompleted ? 'Reopen' : 'Done'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {colTasks.length === 0 && (
+                    <div className="py-8 text-center text-xs text-slate-400">
+                      No tasks in {col.label}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Create / Edit Task Modal */}
       {isModalOpen && (
         <div
-          className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="task-modal-title"
         >
-          <div className="bg-white border border-slate-200 rounded-lg max-w-lg w-full p-6 shadow-lg">
+          <div className="bg-white border border-slate-200 rounded-xl max-w-lg w-full p-6 shadow-xl">
             <div className="flex items-center justify-between pb-4 border-b border-slate-200">
               <h3 id="task-modal-title" className="text-base font-semibold text-slate-900">
                 {editingTask ? 'Edit Action Item' : 'Create New Action Item'}
@@ -490,7 +696,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
                 type="button"
                 onClick={() => setIsModalOpen(false)}
                 aria-label="Close task modal"
-                className="p-1 text-slate-400 hover:text-slate-600"
+                className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -498,7 +704,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
 
             <form onSubmit={handleSubmit} className="mt-4 space-y-4">
               {formError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
                   {formError}
                 </div>
               )}
@@ -515,8 +721,8 @@ export const TasksView: React.FC<TasksViewProps> = ({
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g., Verify Frankfurt backup snapshot encryption"
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  placeholder="e.g., Verify Mumbai BFSI RAG telemetry encryption"
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
 
@@ -532,7 +738,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
                   rows={2}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
 
@@ -550,7 +756,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
                     value={owner}
                     onChange={(e) => setOwner(e.target.value)}
                     placeholder="Name or Unassigned"
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-md"
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg"
                   />
                 </div>
 
@@ -565,7 +771,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
                     id="task-priority-select"
                     value={priority}
                     onChange={(e) => setPriority(e.target.value as TaskPriority)}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-md bg-white"
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white"
                   >
                     <option value="High">High</option>
                     <option value="Medium">Medium</option>
@@ -585,7 +791,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
                     type="date"
                     value={deadline}
                     onChange={(e) => setDeadline(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-md"
+                    className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-lg"
                   />
                 </div>
               </div>
@@ -602,7 +808,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
                     id="task-meeting-select"
                     value={sourceMeetingId}
                     onChange={(e) => setSourceMeetingId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-md bg-white"
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white"
                   >
                     {state.meetings.map((m) => (
                       <option key={m.id} value={m.id}>
@@ -617,13 +823,13 @@ export const TasksView: React.FC<TasksViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg"
+                  className="px-4 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-xs font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg"
+                  className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg cursor-pointer"
                 >
                   {editingTask ? 'Save Task Updates' : 'Create Action Item'}
                 </button>
@@ -633,61 +839,136 @@ export const TasksView: React.FC<TasksViewProps> = ({
         </div>
       )}
 
-      {/* Status History Audit Trail Modal */}
-      {historyTask && (
+      {/* Slide-Over Task Details & Status History Audit Drawer */}
+      {activeDrawerTask && (
         <div
-          className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex justify-end"
           role="dialog"
           aria-modal="true"
           aria-labelledby="history-modal-title"
+          data-testid="task-details-drawer"
+          onClick={() => setHistoryTask(null)}
         >
-          <div className="bg-white border border-slate-200 rounded-lg max-w-lg w-full p-6 shadow-lg">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
-              <div>
-                <h3 id="history-modal-title" className="text-base font-semibold text-slate-900">
-                  Task Status &amp; Lineage History
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">{historyTask.title}</p>
+          <div
+            className="bg-white border-l border-slate-200 max-w-md w-full h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="space-y-5">
+              <div className="flex items-start justify-between pb-4 border-b border-slate-200 gap-3">
+                <div>
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-indigo-600 font-semibold">
+                    Task Details &amp; Audit Lineage
+                  </span>
+                  <h3
+                    id="history-modal-title"
+                    className="text-base font-bold text-slate-900 mt-0.5"
+                  >
+                    {activeDrawerTask.title}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setHistoryTask(null)}
+                  aria-label="Close history modal"
+                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setHistoryTask(null)}
-                aria-label="Close history modal"
-                className="p-1 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
+
+              <div className="space-y-3 text-xs">
+                <p className="text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-lg border border-slate-200">
+                  {activeDrawerTask.description || 'No additional description provided.'}
+                </p>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <div className="text-slate-400 text-[11px]">Assigned Owner</div>
+                    <div className="font-semibold text-slate-900 mt-0.5">
+                      {activeDrawerTask.owner}
+                    </div>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <div className="text-slate-400 text-[11px]">Due Date</div>
+                    <div className="font-mono font-semibold text-slate-900 mt-0.5">
+                      {activeDrawerTask.deadline}
+                    </div>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <div className="text-slate-400 text-[11px]">Priority</div>
+                    <div className="font-semibold text-slate-900 mt-0.5">
+                      {activeDrawerTask.priority}
+                    </div>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <div className="text-slate-400 text-[11px]">Current Status</div>
+                    <div className="font-semibold uppercase text-indigo-700 mt-0.5">
+                      {activeDrawerTask.status}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-indigo-50/50 border border-indigo-100 rounded-lg space-y-1.5">
+                  <div>
+                    <span className="text-slate-500">Original Source Meeting: </span>
+                    <span className="font-semibold text-slate-900">
+                      {activeDrawerTask.sourceMeetingTitle}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Current Active Meeting: </span>
+                    <span className="font-semibold text-slate-900">
+                      {activeDrawerTask.currentMeetingTitle}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold text-slate-800 mb-2">
+                    Status &amp; Carry-Forward History ({activeDrawerTask.statusHistory.length})
+                  </h4>
+                  <div className="divide-y divide-slate-200 border border-slate-200 rounded-lg overflow-hidden">
+                    {activeDrawerTask.statusHistory.map((entry, idx) => (
+                      <div key={idx} className="p-3 space-y-1 bg-white">
+                        <div className="flex items-center justify-between text-slate-500 font-mono tabular-nums text-[11px]">
+                          <span className="font-semibold text-indigo-700">
+                            {entry.fromStatus} → {entry.toStatus}
+                          </span>
+                          <span>{entry.timestamp.slice(0, 16).replace('T', ' ')}</span>
+                        </div>
+                        <p className="text-slate-800">{entry.note}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="mt-4 space-y-3 text-xs">
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded space-y-1">
-                <div>
-                  <span className="text-slate-500">Original Source Meeting: </span>
-                  <span className="font-medium text-slate-900">
-                    {historyTask.sourceMeetingTitle}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-500">Current Active Meeting: </span>
-                  <span className="font-medium text-slate-900">
-                    {historyTask.currentMeetingTitle}
-                  </span>
-                </div>
-              </div>
-
-              <div className="divide-y divide-slate-200 border border-slate-200 rounded">
-                {historyTask.statusHistory.map((entry, idx) => (
-                  <div key={idx} className="p-3 space-y-1">
-                    <div className="flex items-center justify-between text-slate-500 font-mono tabular-nums">
-                      <span>
-                        {entry.fromStatus} → {entry.toStatus}
-                      </span>
-                      <span>{entry.timestamp.slice(0, 16).replace('T', ' ')}</span>
-                    </div>
-                    <p className="text-slate-800">{entry.note}</p>
-                  </div>
-                ))}
-              </div>
+            <div className="pt-4 border-t border-slate-200 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  openEditModal(activeDrawerTask);
+                  setHistoryTask(null);
+                }}
+                className="px-3.5 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer"
+              >
+                Edit Fields
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  onToggleTaskStatus(
+                    activeDrawerTask.id,
+                    activeDrawerTask.status === 'completed' ? 'pending' : 'completed'
+                  )
+                }
+                className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg cursor-pointer"
+              >
+                {activeDrawerTask.status === 'completed'
+                  ? 'Reopen Action Item'
+                  : 'Mark as Completed'}
+              </button>
             </div>
           </div>
         </div>

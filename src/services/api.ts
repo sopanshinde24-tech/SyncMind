@@ -7,16 +7,18 @@ import {
   createTask,
   deleteMeeting,
   deleteTask,
+  executeCopilotTurn,
   extractMeetingDeterministic,
   resetToDemoState,
   updateMeeting,
   updateTask,
   updateTaskStatus,
+  CopilotTurnResponse,
 } from '../core/engine';
 import { createInitialSeedState } from '../core/seedData';
 import { AIAnalysisResult, AppDatabaseState, TaskPriority, TaskStatus } from '../core/types';
 
-const LOCAL_STORAGE_KEY = 'syncmind_ai_state_v1';
+const LOCAL_STORAGE_KEY = 'syncmind_ai_pwc_state_v2';
 
 function saveLocalMirror(state: AppDatabaseState): void {
   try {
@@ -336,6 +338,24 @@ export async function apiGenerateExecutiveReport(fastMode?: boolean): Promise<{
   return data;
 }
 
+export async function apiSendCopilotMessage(message: string): Promise<CopilotTurnResponse> {
+  try {
+    const res = await fetch('/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+    });
+    if (!res.ok) throw new Error('Copilot request failed');
+    const data = (await res.json()) as CopilotTurnResponse;
+    saveLocalMirror(data.state);
+    return data;
+  } catch {
+    const fallback = executeCopilotTurn(loadLocalMirror(), message);
+    saveLocalMirror(fallback.state);
+    return fallback;
+  }
+}
+
 export {
   createMeeting,
   updateMeeting,
@@ -347,3 +367,4 @@ export {
   createHandover,
   acknowledgeHandover,
 };
+

@@ -6,9 +6,9 @@ import {
   calculateDashboardMetrics,
   calculateWeeklyReport,
   carryForwardTask,
-  createHandover,
   createMeeting,
   createTask,
+  executeCopilotTurn,
   extractMeetingDeterministic,
   resetToDemoState,
   updateMeeting,
@@ -17,10 +17,16 @@ import {
 } from './engine';
 import { createInitialSeedState } from './seedData';
 
-test('1. Initial Demo Seed State matches Q4 Business Operations Review specification', () => {
+test('1. Initial Demo Seed State matches PwC India Q4 Business AI Review specification', () => {
   const state = createInitialSeedState();
-  assert.equal(state.scenarioName, 'Scenario: Q4 Business Operations Review');
+  assert.equal(
+    state.scenarioName,
+    'Scenario: PwC India — Q4 Business AI & GenAI Delivery Review'
+  );
   assert.equal(state.participants.length, 3);
+  assert.equal(state.participants[0].name, 'Ananya Sharma');
+  assert.equal(state.participants[1].name, 'Rohan Deshmukh');
+  assert.equal(state.participants[2].name, 'Priya Nair');
   assert.equal(state.meetings.length, 2);
   assert.equal(state.tasks.length, 5);
 
@@ -36,52 +42,52 @@ test('1. Initial Demo Seed State matches Q4 Business Operations Review specifica
 test('2. Meeting creation and editing validation & state persistence', () => {
   let state = createInitialSeedState();
   state = createMeeting(state, {
-    title: 'Q4 Security & Compliance Sync',
+    title: 'PwC India BFSI Security & DPDP Audit Sync',
     date: '2026-11-04',
-    participants: ['Elena Rostova', 'Marcus Vance'],
-    agenda: 'Review DACH banking firewall rules and SOC2 DPA status',
-    notes: 'Initial security alignment',
+    participants: ['Ananya Sharma', 'Rohan Deshmukh'],
+    agenda: 'Review RBI cloud firewall rules and ISO 42001 sign-off status',
+    notes: 'Initial security alignment across Gurugram and Bengaluru',
   });
   assert.equal(state.meetings.length, 3);
   const createdId = state.meetings[0].id;
 
   state = updateMeeting(state, createdId, {
-    title: 'Q4 Security & Compliance Executive Sync',
+    title: 'PwC India BFSI Security & DPDP Partner Sync',
     notes: 'Updated notes with auditor timeline',
   });
-  assert.equal(state.meetings[0].title, 'Q4 Security & Compliance Executive Sync');
+  assert.equal(state.meetings[0].title, 'PwC India BFSI Security & DPDP Partner Sync');
   assert.equal(state.meetings[0].notes, 'Updated notes with auditor timeline');
 });
 
 test('3. AI output validation enforces Unassigned / Unspecified for missing owners and dates', () => {
   const rawAIOutput = {
-    summary: 'Reviewed infrastructure costs and rollout tasks.',
-    decisions: [{ summary: 'Launch top 25 strategic accounts on Nov 10', owner: '' }],
+    summary: 'Reviewed RAG vector latency and FinOps costs.',
+    decisions: [{ summary: 'Launch top 15 Indian BFSI accounts on Nov 10', owner: '' }],
     actionItems: [
       {
-        title: 'Compile consolidated Q4 board deck infrastructure cost forecast',
+        title: 'Compile consolidated Q4 Partner steering deck token FinOps cost forecast',
         description: 'Prepare cost forecast',
         owner: 'unknown',
         priority: 'High',
         deadline: 'TBD',
       },
       {
-        title: 'Deploy SLA latency alert webhook',
-        description: 'Deploy to #ops-enterprise',
-        owner: 'Marcus Vance',
+        title: 'Deploy hallucination & token latency telemetry webhook',
+        description: 'Deploy to #pwc-ai-ops',
+        owner: 'Rohan Deshmukh',
         priority: 'High',
         deadline: '2026-11-04',
       },
     ],
-    blockers: [{ description: 'Firewall IP whitelisting pending', owner: null, severity: 'High' }],
-    nextSteps: ['Follow up with DACH security team'],
+    blockers: [{ description: 'RBI firewall IP whitelisting pending', owner: null, severity: 'High' }],
+    nextSteps: ['Follow up with Mumbai bank infosec team'],
   };
 
   const validated = validateAIAnalysisOutput(rawAIOutput);
   assert.equal(validated.decisions[0].owner, 'Unspecified');
   assert.equal(validated.actionItems[0].owner, 'Unassigned');
   assert.equal(validated.actionItems[0].deadline, 'Unspecified');
-  assert.equal(validated.actionItems[1].owner, 'Marcus Vance');
+  assert.equal(validated.actionItems[1].owner, 'Rohan Deshmukh');
   assert.equal(validated.actionItems[1].deadline, '2026-11-04');
   assert.equal(validated.blockers[0].owner, 'Unassigned');
 
@@ -98,8 +104,8 @@ test('3. AI output validation enforces Unassigned / Unspecified for missing owne
 test('4. Task creation and status changes update metrics and statusHistory', () => {
   let state = createInitialSeedState();
   state = createTask(state, {
-    title: 'Verify Frankfurt backup snapshot encryption',
-    owner: 'Marcus Vance',
+    title: 'Verify Mumbai vector snapshot AES-256 encryption',
+    owner: 'Rohan Deshmukh',
     priority: 'High',
     deadline: '2026-11-06',
     sourceMeetingId: 'mtg-q4-ops-2',
@@ -122,7 +128,7 @@ test('5. Carry-forward logic preserves original source meeting and prevents dupl
     state,
     'task-2',
     'mtg-q4-ops-2',
-    'Upstream SDK patch delayed completion; carrying into Part 2 sprint.'
+    'Upstream connector patch delayed completion; carrying into Part 2 sprint.'
   );
 
   const carriedTask = state.tasks.find((t) => t.id === 'task-2')!;
@@ -137,13 +143,28 @@ test('5. Carry-forward logic preserves original source meeting and prevents dupl
   }, /already been carried/);
 });
 
-test('6. Report calculations and Handover acknowledgment work accurately', () => {
+test('6. Report calculations, Handover acknowledgment, and AI Copilot actions work accurately', () => {
   let state = createInitialSeedState();
   const analysis = extractMeetingDeterministic(state.meetings[1].transcript);
   state = approveAIAnalysisToMeeting(state, 'mtg-q4-ops-2', analysis);
-  state = updateTaskStatus(state, 'task-4', 'completed', 'Published EMEA escalation runbook.');
-  state = carryForwardTask(state, 'task-2', 'mtg-q4-ops-2');
-  state = acknowledgeHandover(state, 'hnd-1', 'Acknowledged by Priya Nair.');
+
+  // Test AI Copilot completing Priya's task
+  const copilotComplete = executeCopilotTurn(
+    state,
+    "Mark Priya Nair's compliance runbook task complete"
+  );
+  assert.ok(copilotComplete.executedAction?.includes('Completed Task'));
+  state = copilotComplete.state;
+
+  // Test AI Copilot carrying forward Rohan's overdue task
+  const copilotCarry = executeCopilotTurn(
+    state,
+    "Carry forward Rohan's overdue LangChain task into Part 2"
+  );
+  assert.ok(copilotCarry.executedAction?.includes('Carried Forward'));
+  state = copilotCarry.state;
+
+  state = acknowledgeHandover(state, 'hnd-1', 'Acknowledged by Priya Nair in Mumbai.');
 
   const report = calculateWeeklyReport(state);
   assert.equal(report.metrics.completedTasks, 2);

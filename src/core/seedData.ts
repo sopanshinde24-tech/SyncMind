@@ -4,34 +4,34 @@ export const REFERENCE_DATE = '2026-11-02';
 
 export function createInitialSeedState(): AppDatabaseState {
   return {
-    scenarioName: 'Scenario: Q4 Business Operations Review',
+    scenarioName: 'Scenario: PwC India — Q4 Business AI & GenAI Delivery Review',
     referenceDate: REFERENCE_DATE,
     lastUpdated: '2026-11-02T09:00:00Z',
     participants: [
       {
         id: 'part-1',
-        name: 'Elena Rostova',
-        role: 'VP of Operations',
-        department: 'Executive Operations',
-        email: 'elena.rostova@syncmind.io',
-        avatarUrl: '/src/assets/images/avatar_elena_rostova_1793622798344.jpg',
-        initials: 'ER',
+        name: 'Ananya Sharma',
+        role: 'Director, Business AI Advisory',
+        department: 'PwC India · Gurugram',
+        email: 'ananya.sharma@pwc-india-demo.in',
+        avatarUrl: '/src/assets/images/avatar_ananya_sharma_1793629242581.jpg',
+        initials: 'AS',
       },
       {
         id: 'part-2',
-        name: 'Marcus Vance',
-        role: 'Principal Infrastructure Lead',
-        department: 'Platform Engineering',
-        email: 'marcus.vance@syncmind.io',
-        avatarUrl: '/src/assets/images/avatar_marcus_vance_1793622799111.jpg',
-        initials: 'MV',
+        name: 'Rohan Deshmukh',
+        role: 'Lead Business AI Engineer',
+        department: 'PwC India · Bengaluru',
+        email: 'rohan.deshmukh@pwc-india-demo.in',
+        avatarUrl: '/src/assets/images/avatar_rohan_deshmukh_1793629242530.jpg',
+        initials: 'RD',
       },
       {
         id: 'part-3',
         name: 'Priya Nair',
-        role: 'Director of Customer Success',
-        department: 'Enterprise Success',
-        email: 'priya.nair@syncmind.io',
+        role: 'Senior Manager, AI Governance & Delivery',
+        department: 'PwC India · Mumbai',
+        email: 'priya.nair@pwc-india-demo.in',
         avatarUrl: '/src/assets/images/avatar_priya_nair_1793622799399.jpg',
         initials: 'PN',
       },
@@ -39,29 +39,29 @@ export function createInitialSeedState(): AppDatabaseState {
     meetings: [
       {
         id: 'mtg-q4-ops-1',
-        title: 'Q4 Business Operations Review — Part 1: Infrastructure & SLA Alignment',
+        title: 'PwC India Business AI Review — Part 1: Enterprise RAG Architecture & Guardrails',
         date: '2026-10-28',
         startTime: '10:00 AM',
         durationMinutes: 45,
-        participants: ['Elena Rostova', 'Marcus Vance', 'Priya Nair'],
+        participants: ['Ananya Sharma', 'Rohan Deshmukh', 'Priya Nair'],
         agenda:
-          '1. Review EU-Central database latency and failover readiness\n2. Finalize Q4 enterprise SLA uptime credit tiers\n3. Resolve Stripe billing webhook queue backlog\n4. Align EMEA enterprise support escalation runbook',
+          '1. Review Mumbai cloud region RAG vector index latency and failover readiness\n2. Finalize Q4 enterprise GenAI accuracy & SLA credit tiers for BFSI clients\n3. Resolve LangChain document ingestion dead-letter queue backlog\n4. Align Responsible AI & DPDP Act compliance escalation runbook',
         notes:
-          'Team reviewed Q3 post-mortem metrics and Q4 enterprise readiness. EU-Central read-replica stress testing was prioritized ahead of peak seasonal traffic. Legal still needs the updated SLA credit tier matrix by Nov 1. SOC2 auditor sign-off on EU logging is blocked by a pending DPA counter-signature.',
-        transcript: `[00:00:12] Elena Rostova: Let's kick off Part 1 of our Q4 Business Operations Review. Our primary goal today is locking down infrastructure stability and enterprise SLA commitments before the November peak window.
-[00:01:04] Marcus Vance: On the infrastructure side, I completed the initial preparation for the EU-Central read-replica failover stress test. I will finish the full failover stress test and publish the latency benchmark report by 2026-10-30.
-[00:02:18] Priya Nair: That's critical for our Frankfurt enterprise accounts. However, several EMEA renewal prospects asked about our uptime guarantees.
-[00:03:05] Elena Rostova: Decision made: We will standardize our enterprise tier SLA uptime guarantee at 99.95% with automated credit triggers starting November 15. I will finalize the revised Q4 Enterprise SLA credit tier matrix with Legal by 2026-11-01.
-[00:04:22] Marcus Vance: Understood. Also, Decision: We will freeze all non-critical database schema migrations during the Black Friday to Cyber Monday peak window from Nov 20 through Dec 2. One more urgent engineering item: I need to migrate our legacy Stripe webhook queue to the new dead-letter retry worker by 2026-10-31 so billing retries never block checkout events.
-[00:05:40] Elena Rostova: Are there any external blockers we need to flag?
-[00:06:02] Elena Rostova: Yes, we have one High-severity blocker: SOC2 Type II external auditor sign-off on the new EU-Central logging pipeline is delayed awaiting the vendor DPA counter-signature.
-[00:07:15] Priya Nair: For customer operations, I will publish the updated onboarding runbook for EMEA enterprise support escalation by 2026-11-05.`,
+          'PwC India Business AI delivery leadership reviewed Q3 client pilot metrics and Q4 enterprise production readiness. Mumbai region vector database failover testing was prioritized ahead of festive banking volume. Legal still needs the updated GenAI SLA matrix by Nov 1. ISO 42001 & DPDP auditor sign-off on Mumbai telemetry is blocked by a pending client InfoSec counter-signature.',
+        transcript: `[00:00:12] Ananya Sharma: Welcome team to Part 1 of our PwC India Q4 Business AI & GenAI Delivery Review. Our priority across Gurugram, Bengaluru, and Mumbai today is locking down our enterprise RAG architecture and client SLA commitments before the November production cutover.
+[00:01:04] Rohan Deshmukh: From the Business AI Engineering side in Bengaluru, I completed the initial setup for the Mumbai region vector index failover test. I will finish the full Mumbai region RAG vector index failover & latency benchmark by 2026-10-30.
+[00:02:18] Priya Nair: That benchmark is essential for our Mumbai BFSI banking engagements. Several enterprise transformation sponsors asked about our hallucination guardrails and uptime SLA guarantees.
+[00:03:05] Ananya Sharma: Decision made: We will standardize our enterprise GenAI tier SLA at 99.95% availability with mandatory grounded citation thresholds starting November 15. I will finalize the revised Q4 Enterprise GenAI SLA & governance matrix with Legal by 2026-11-01.
+[00:04:22] Rohan Deshmukh: Understood. Also, Decision: We will freeze all non-critical embedding model & vector schema migrations during the festive quarter-end banking peak window from Nov 20 through Dec 2. One more urgent engineering item: I need to migrate our legacy LangChain ingestion queue to the async dead-letter worker by 2026-10-31 so large PDF regulatory filings never block real-time retrieval.
+[00:05:40] Ananya Sharma: Are there any external compliance blockers we need to escalate to the Partner committee?
+[00:06:02] Ananya Sharma: Yes, we have one High-severity blocker: DPDP Act & ISO 42001 external auditor sign-off on the Mumbai BFSI telemetry pipeline is delayed awaiting the client InfoSec counter-signature.
+[00:07:15] Priya Nair: For governance and client delivery in Mumbai, I will publish the Responsible AI & DPDP compliance runbook for BFSI client rollout by 2026-11-05.`,
         aiSummary:
-          'The operations and engineering leadership aligned on Q4 infrastructure resilience and enterprise SLA standards. The team decided to standardize enterprise SLA guarantees at 99.95% uptime and institute a schema migration freeze during peak holiday traffic. Four key operational and engineering action items were assigned across Marcus, Elena, and Priya, while a vendor DPA counter-signature blocker on the SOC2 EU logging pipeline was flagged.',
+          'PwC India Business AI leadership aligned on Q4 enterprise RAG resilience, DPDP Act compliance guardrails, and BFSI client SLA standards. The team decided to standardize enterprise GenAI SLA availability at 99.95% with grounded citation thresholds and freeze vector schema migrations during peak banking windows. Four core engineering and governance action items were assigned across Rohan, Ananya, and Priya, while a client InfoSec counter-signature blocker on the Mumbai telemetry audit was escalated.',
         nextSteps: [
-          'Verify completion of EU-Central read-replica stress benchmarks',
-          'Escalate vendor DPA counter-signature with Legal to unblock SOC2 audit',
-          'Review uncompleted October tasks in the Nov 2 Q4 Operations Sync',
+          'Verify completion of Mumbai region RAG vector index latency benchmarks',
+          'Escalate client InfoSec counter-signature to unblock DPDP & ISO 42001 audit',
+          'Review uncompleted October engineering tasks in the Nov 2 Part 2 Delivery Sync',
         ],
         aiAnalyzedAt: '2026-10-28T11:00:00Z',
         carriedTaskIds: [],
@@ -69,22 +69,22 @@ export function createInitialSeedState(): AppDatabaseState {
       },
       {
         id: 'mtg-q4-ops-2',
-        title: 'Q4 Business Operations Review — Part 2: Enterprise Rollout & Handover Sync',
+        title: 'PwC India Business AI Review — Part 2: Production Rollout & Client Handover Sync',
         date: '2026-11-02',
         startTime: '09:30 AM',
         durationMinutes: 50,
-        participants: ['Elena Rostova', 'Marcus Vance', 'Priya Nair'],
+        participants: ['Ananya Sharma', 'Rohan Deshmukh', 'Priya Nair'],
         agenda:
-          '1. Audit status of Part 1 action items & carry forward overdue work\n2. Finalize Q4 enterprise customer rollout schedule & telemetry dashboard\n3. Review Q3 churn survey audit & EMEA support handover',
+          '1. Audit status of Part 1 Business AI action items & carry forward overdue work\n2. Finalize Q4 BFSI client rollout schedule & guardrails telemetry alert webhook\n3. Review Q3 UAT citation accuracy audit & Mumbai delivery handover',
         notes:
-          'Follow-up Q4 operations session. Need to run AI transcript analysis on today\'s discussion to capture new decisions, extract action items, and carry forward unfinished tasks from the Oct 28 review.',
-        transcript: `[00:00:15] Elena Rostova: Welcome back everyone to Part 2 of our Q4 Business Operations Review. First, let's address where we stand on last week's items and lock in our November rollout plan.
-[00:01:10] Marcus Vance: The EU-Central read-replica stress test is 100% completed—p99 latency stayed under 18ms during simulated node failure. However, the Stripe webhook dead-letter worker migration slipped past the October 31 deadline because of an upstream SDK patch; we need to carry that task forward into this week's sprint.
-[00:02:25] Elena Rostova: Agreed, and my revised Q4 Enterprise SLA credit tier matrix is also one day overdue waiting on redlines from outside counsel. Decision: We will launch the phased Q4 Enterprise SLA rollout to our top 25 strategic accounts on 2026-11-10 rather than waiting for the mid-month batch.
-[00:03:45] Priya Nair: That gives my team clear dates. Decision: All EMEA Tier-1 enterprise accounts will transition to the dedicated 15-minute response queue managed by Customer Success starting 2026-11-06.
-[00:04:50] Marcus Vance: Action item for me: I will deploy the real-time SLA latency telemetry alert webhook to the #ops-enterprise channel by 2026-11-04. Priority is High.
-[00:05:35] Priya Nair: I am already tracking the Q3 churned account exit survey audit for 2026-11-08. In addition, I will schedule executive QBR briefing calls with the top 10 EMEA renewal accounts by 2026-11-06. Priority is High.
-[00:06:20] Elena Rostova: We also need someone to compile the consolidated Q4 board deck infrastructure cost forecast, though we haven't assigned an owner or exact due date yet. Also note a new blocker: Production API rate-limit sandbox testing for DACH banking clients is blocked by pending firewall IP whitelisting from their security team.`,
+          "Follow-up PwC India Business AI delivery session. Need to run AI transcript analysis on today's discussion to capture new Partner decisions, extract action items, and carry forward unfinished engineering tasks from the Oct 28 review.",
+        transcript: `[00:00:15] Ananya Sharma: Welcome back Rohan and Priya to Part 2 of our PwC India Q4 Business AI & GenAI Delivery Review. Let's review where we stand on last week's engineering deliverables and lock in our November client rollout plan.
+[00:01:10] Rohan Deshmukh: The Mumbai region RAG vector index failover & latency benchmark is 100% completed—p99 retrieval latency stayed under 18ms during simulated node failure. However, migrating the legacy LangChain ingestion queue to the async dead-letter worker slipped past the October 31 deadline due to an upstream connector patch; we need to carry that task forward into this week's sprint.
+[00:02:25] Ananya Sharma: Noted, and my revised Q4 Enterprise GenAI SLA & governance matrix is also one day overdue waiting on final clause redlines from Mumbai Legal. Decision: We will launch the phased Q4 Enterprise GenAI Copilot rollout to our top 15 Indian BFSI and manufacturing accounts on 2026-11-10 rather than waiting for the mid-month batch.
+[00:03:45] Priya Nair: That gives our Mumbai and Gurugram engagement teams clear cutover dates. Decision: All Tier-1 BFSI client deployments will transition to the dedicated 15-minute Responsible AI governance desk managed by Delivery Assurance starting 2026-11-06.
+[00:04:50] Rohan Deshmukh: Action item for me: I will deploy the real-time hallucination & token latency telemetry webhook to the #pwc-ai-ops channel by 2026-11-04. Priority is High.
+[00:05:35] Priya Nair: I am already tracking the Q3 client UAT feedback logs audit for 2026-11-08. In addition, I will schedule executive AI governance walkthroughs with the top 10 Mumbai BFSI client sponsors by 2026-11-06. Priority is High.
+[00:06:20] Ananya Sharma: We also need someone to compile the consolidated Q4 Partner steering deck token FinOps cost forecast, though we haven't assigned an owner or exact due date yet. Also note a new blocker: Production API rate-limit sandbox testing for our Mumbai private sector bank client is blocked by pending RBI cloud firewall IP whitelisting from their infosec team.`,
         carriedTaskIds: [],
         createdAt: '2026-11-02T09:00:00Z',
       },
@@ -92,31 +92,33 @@ export function createInitialSeedState(): AppDatabaseState {
     tasks: [
       {
         id: 'task-1',
-        title: 'Complete EU-Central read-replica failover stress test',
+        title: 'Complete Mumbai region RAG vector index failover & latency benchmark',
         description:
-          'Execute multi-zone failover simulation on Frankfurt cluster and verify p99 read latency stays below 25ms.',
-        owner: 'Marcus Vance',
+          'Execute multi-zone failover simulation on Mumbai cloud cluster and verify p99 vector retrieval latency stays below 25ms.',
+        owner: 'Rohan Deshmukh',
         priority: 'High',
         deadline: '2026-10-30',
         status: 'completed',
         sourceMeetingId: 'mtg-q4-ops-1',
-        sourceMeetingTitle: 'Q4 Business Operations Review — Part 1: Infrastructure & SLA Alignment',
+        sourceMeetingTitle:
+          'PwC India Business AI Review — Part 1: Enterprise RAG Architecture & Guardrails',
         currentMeetingId: 'mtg-q4-ops-1',
-        currentMeetingTitle: 'Q4 Business Operations Review — Part 1: Infrastructure & SLA Alignment',
+        currentMeetingTitle:
+          'PwC India Business AI Review — Part 1: Enterprise RAG Architecture & Guardrails',
         carriedFromMeetingIds: [],
         statusHistory: [
           {
             timestamp: '2026-10-28T10:45:00Z',
             fromStatus: 'created',
             toStatus: 'pending',
-            note: 'Extracted from Q4 Business Operations Review — Part 1',
+            note: 'Extracted from PwC India Business AI Review — Part 1',
             meetingId: 'mtg-q4-ops-1',
           },
           {
             timestamp: '2026-10-30T16:20:00Z',
             fromStatus: 'pending',
             toStatus: 'completed',
-            note: 'Failover verified at 18ms p99 latency; benchmark report published.',
+            note: 'Failover verified at 18ms p99 retrieval latency; benchmark report shared with Partner group.',
             meetingId: 'mtg-q4-ops-1',
           },
         ],
@@ -125,31 +127,33 @@ export function createInitialSeedState(): AppDatabaseState {
       },
       {
         id: 'task-2',
-        title: 'Migrate legacy Stripe webhook queue to dead-letter retry worker',
+        title: 'Migrate legacy LangChain ingestion queue to async dead-letter worker',
         description:
-          'Move synchronous billing webhook handlers to isolated BullMQ dead-letter worker to eliminate checkout retry bottlenecks.',
-        owner: 'Marcus Vance',
+          'Move synchronous PDF chunking and embedding handlers to isolated BullMQ dead-letter worker to eliminate ingestion bottlenecks.',
+        owner: 'Rohan Deshmukh',
         priority: 'High',
         deadline: '2026-10-31',
         status: 'overdue',
         sourceMeetingId: 'mtg-q4-ops-1',
-        sourceMeetingTitle: 'Q4 Business Operations Review — Part 1: Infrastructure & SLA Alignment',
+        sourceMeetingTitle:
+          'PwC India Business AI Review — Part 1: Enterprise RAG Architecture & Guardrails',
         currentMeetingId: 'mtg-q4-ops-1',
-        currentMeetingTitle: 'Q4 Business Operations Review — Part 1: Infrastructure & SLA Alignment',
+        currentMeetingTitle:
+          'PwC India Business AI Review — Part 1: Enterprise RAG Architecture & Guardrails',
         carriedFromMeetingIds: [],
         statusHistory: [
           {
             timestamp: '2026-10-28T10:45:00Z',
             fromStatus: 'created',
             toStatus: 'pending',
-            note: 'Assigned during Q4 Business Operations Review — Part 1',
+            note: 'Assigned during PwC India Business AI Review — Part 1',
             meetingId: 'mtg-q4-ops-1',
           },
           {
             timestamp: '2026-11-01T00:05:00Z',
             fromStatus: 'pending',
             toStatus: 'overdue',
-            note: 'Deadline 2026-10-31 passed without completion.',
+            note: 'Deadline 2026-10-31 passed awaiting upstream connector patch.',
             meetingId: 'mtg-q4-ops-1',
           },
         ],
@@ -157,31 +161,33 @@ export function createInitialSeedState(): AppDatabaseState {
       },
       {
         id: 'task-3',
-        title: 'Finalize revised Q4 Enterprise SLA credit tier matrix with Legal',
+        title: 'Finalize revised Q4 Enterprise GenAI SLA & governance matrix with Legal',
         description:
-          'Incorporate 99.95% uptime guarantee and automated service credit schedule into the standard Enterprise MSA addendum.',
-        owner: 'Elena Rostova',
+          'Incorporate 99.95% availability guarantee, DPDP Act clauses, and grounded citation thresholds into the standard client SOW addendum.',
+        owner: 'Ananya Sharma',
         priority: 'High',
         deadline: '2026-11-01',
         status: 'overdue',
         sourceMeetingId: 'mtg-q4-ops-1',
-        sourceMeetingTitle: 'Q4 Business Operations Review — Part 1: Infrastructure & SLA Alignment',
+        sourceMeetingTitle:
+          'PwC India Business AI Review — Part 1: Enterprise RAG Architecture & Guardrails',
         currentMeetingId: 'mtg-q4-ops-1',
-        currentMeetingTitle: 'Q4 Business Operations Review — Part 1: Infrastructure & SLA Alignment',
+        currentMeetingTitle:
+          'PwC India Business AI Review — Part 1: Enterprise RAG Architecture & Guardrails',
         carriedFromMeetingIds: [],
         statusHistory: [
           {
             timestamp: '2026-10-28T10:45:00Z',
             fromStatus: 'created',
             toStatus: 'pending',
-            note: 'Assigned during Q4 Business Operations Review — Part 1',
+            note: 'Assigned during PwC India Business AI Review — Part 1',
             meetingId: 'mtg-q4-ops-1',
           },
           {
             timestamp: '2026-11-02T00:05:00Z',
             fromStatus: 'pending',
             toStatus: 'overdue',
-            note: 'Deadline 2026-11-01 passed awaiting final redline review.',
+            note: 'Deadline 2026-11-01 passed awaiting final redline review from Mumbai Legal.',
             meetingId: 'mtg-q4-ops-1',
           },
         ],
@@ -189,24 +195,26 @@ export function createInitialSeedState(): AppDatabaseState {
       },
       {
         id: 'task-4',
-        title: 'Publish onboarding runbook for EMEA enterprise support escalation',
+        title: 'Publish Responsible AI & DPDP compliance runbook for BFSI client rollout',
         description:
-          'Document Tier-1 SLA response workflows, PagerDuty rotation handoffs, and Frankfurt cluster diagnostic checklists.',
+          'Document Tier-1 prompt injection incident workflows, PII redaction checks, and Mumbai cluster diagnostic checklists.',
         owner: 'Priya Nair',
         priority: 'Medium',
         deadline: '2026-11-05',
         status: 'pending',
         sourceMeetingId: 'mtg-q4-ops-1',
-        sourceMeetingTitle: 'Q4 Business Operations Review — Part 1: Infrastructure & SLA Alignment',
+        sourceMeetingTitle:
+          'PwC India Business AI Review — Part 1: Enterprise RAG Architecture & Guardrails',
         currentMeetingId: 'mtg-q4-ops-1',
-        currentMeetingTitle: 'Q4 Business Operations Review — Part 1: Infrastructure & SLA Alignment',
+        currentMeetingTitle:
+          'PwC India Business AI Review — Part 1: Enterprise RAG Architecture & Guardrails',
         carriedFromMeetingIds: [],
         statusHistory: [
           {
             timestamp: '2026-10-28T10:45:00Z',
             fromStatus: 'created',
             toStatus: 'pending',
-            note: 'Assigned during Q4 Business Operations Review — Part 1',
+            note: 'Assigned during PwC India Business AI Review — Part 1',
             meetingId: 'mtg-q4-ops-1',
           },
         ],
@@ -214,24 +222,26 @@ export function createInitialSeedState(): AppDatabaseState {
       },
       {
         id: 'task-5',
-        title: 'Audit Q3 churned account exit surveys for top 3 integration friction points',
+        title: 'Audit Q3 client UAT feedback logs for top 3 RAG citation accuracy gaps',
         description:
-          'Synthesize exit interview notes from Q3 mid-market and enterprise churn to prioritize Q4 onboarding improvements.',
+          'Synthesize UAT evaluation logs from Q3 enterprise pilots to prioritize Q4 hybrid-search reranker tuning.',
         owner: 'Priya Nair',
         priority: 'Low',
         deadline: '2026-11-08',
         status: 'pending',
         sourceMeetingId: 'mtg-q4-ops-2',
-        sourceMeetingTitle: 'Q4 Business Operations Review — Part 2: Enterprise Rollout & Handover Sync',
+        sourceMeetingTitle:
+          'PwC India Business AI Review — Part 2: Production Rollout & Client Handover Sync',
         currentMeetingId: 'mtg-q4-ops-2',
-        currentMeetingTitle: 'Q4 Business Operations Review — Part 2: Enterprise Rollout & Handover Sync',
+        currentMeetingTitle:
+          'PwC India Business AI Review — Part 2: Production Rollout & Client Handover Sync',
         carriedFromMeetingIds: [],
         statusHistory: [
           {
             timestamp: '2026-11-02T09:15:00Z',
             fromStatus: 'created',
             toStatus: 'pending',
-            note: 'Logged ahead of Q4 Business Operations Review — Part 2',
+            note: 'Logged ahead of PwC India Business AI Review — Part 2',
             meetingId: 'mtg-q4-ops-2',
           },
         ],
@@ -242,32 +252,35 @@ export function createInitialSeedState(): AppDatabaseState {
       {
         id: 'dec-1',
         meetingId: 'mtg-q4-ops-1',
-        meetingTitle: 'Q4 Business Operations Review — Part 1: Infrastructure & SLA Alignment',
+        meetingTitle:
+          'PwC India Business AI Review — Part 1: Enterprise RAG Architecture & Guardrails',
         summary:
-          'Standardize enterprise tier SLA uptime guarantee at 99.95% with automated credit triggers starting November 15.',
-        owner: 'Elena Rostova',
+          'Standardize enterprise GenAI tier SLA at 99.95% availability with mandatory grounded citation thresholds starting November 15.',
+        owner: 'Ananya Sharma',
         date: '2026-10-28',
-        impactArea: 'Enterprise Contracts & SLA',
+        impactArea: 'Client SOW & GenAI Governance',
       },
       {
         id: 'dec-2',
         meetingId: 'mtg-q4-ops-1',
-        meetingTitle: 'Q4 Business Operations Review — Part 1: Infrastructure & SLA Alignment',
+        meetingTitle:
+          'PwC India Business AI Review — Part 1: Enterprise RAG Architecture & Guardrails',
         summary:
-          'Freeze non-critical database schema migrations during the Black Friday / Cyber Monday peak window (Nov 20 – Dec 2).',
-        owner: 'Marcus Vance',
+          'Freeze non-critical embedding model & vector schema migrations during the festive banking peak window (Nov 20 – Dec 2).',
+        owner: 'Rohan Deshmukh',
         date: '2026-10-28',
-        impactArea: 'Platform Reliability',
+        impactArea: 'Business AI Engineering',
       },
     ],
     blockers: [
       {
         id: 'blk-1',
         meetingId: 'mtg-q4-ops-1',
-        meetingTitle: 'Q4 Business Operations Review — Part 1: Infrastructure & SLA Alignment',
+        meetingTitle:
+          'PwC India Business AI Review — Part 1: Enterprise RAG Architecture & Guardrails',
         description:
-          'SOC2 Type II external auditor sign-off on the new EU-Central logging pipeline is delayed awaiting vendor DPA counter-signature.',
-        owner: 'Elena Rostova',
+          'DPDP Act & ISO 42001 external auditor sign-off on the Mumbai BFSI telemetry pipeline is delayed awaiting client InfoSec counter-signature.',
+        owner: 'Ananya Sharma',
         severity: 'High',
         status: 'Active',
         reportedAt: '2026-10-28',
@@ -277,32 +290,32 @@ export function createInitialSeedState(): AppDatabaseState {
     handovers: [
       {
         id: 'hnd-1',
-        title: 'EMEA Enterprise Onboarding & SLA Escalation Handover',
+        title: 'PwC India BFSI GenAI Rollout & Governance Escalation Handover',
         projectContext:
-          'Transitioning operational ownership of the Q4 EMEA Enterprise SLA Rollout and Frankfurt cluster incident response communication from Executive Operations (Elena Rostova) to Enterprise Customer Success (Priya Nair) ahead of the November 10 strategic account launch.',
-        fromPerson: 'Elena Rostova',
+          'Transitioning operational ownership of the Q4 Enterprise GenAI Rollout and Mumbai BFSI client governance communication from Business AI Advisory (Ananya Sharma, Gurugram) to AI Governance & Delivery Assurance (Priya Nair, Mumbai) ahead of the November 10 production launch.',
+        fromPerson: 'Ananya Sharma',
         toPerson: 'Priya Nair',
         createdAt: '2026-11-01T17:30:00Z',
         completedWork: [
-          'Completed EU-Central read-replica failover stress test at 18ms p99 latency (Marcus Vance)',
-          'Approved 99.95% enterprise SLA uptime standard across Executive Operations and Engineering',
-          'Established peak holiday schema migration freeze window (Nov 20 – Dec 2)',
+          'Completed Mumbai region RAG vector index failover & latency benchmark at 18ms p99 retrieval (Rohan Deshmukh)',
+          'Approved 99.95% enterprise GenAI SLA and grounded citation threshold across Advisory and Engineering',
+          'Established festive quarter-end vector schema migration freeze window (Nov 20 – Dec 2)',
         ],
         pendingTasks: [
-          'Finalize revised Q4 Enterprise SLA credit tier matrix with Legal (Elena Rostova — Overdue)',
-          'Publish onboarding runbook for EMEA enterprise support escalation (Priya Nair — Due Nov 5)',
-          'Migrate legacy Stripe webhook queue to dead-letter retry worker (Marcus Vance — Overdue)',
+          'Finalize revised Q4 Enterprise GenAI SLA & governance matrix with Legal (Ananya Sharma — Overdue)',
+          'Publish Responsible AI & DPDP compliance runbook for BFSI client rollout (Priya Nair — Due Nov 5)',
+          'Migrate legacy LangChain ingestion queue to async dead-letter worker (Rohan Deshmukh — Overdue)',
         ],
         blockers: [
-          'SOC2 Type II external auditor sign-off on EU-Central logging pipeline delayed awaiting vendor DPA counter-signature',
+          'DPDP Act & ISO 42001 external auditor sign-off on Mumbai BFSI telemetry pipeline delayed awaiting client InfoSec counter-signature',
         ],
         decisions: [
-          'Standardize enterprise tier SLA uptime guarantee at 99.95% starting November 15',
-          'Freeze non-critical schema migrations from Nov 20 to Dec 2',
+          'Standardize enterprise GenAI tier SLA at 99.95% availability starting November 15',
+          'Freeze non-critical embedding model & vector schema migrations from Nov 20 to Dec 2',
         ],
         nextSteps: [
-          'Acknowledge handover and circulate EMEA support runbook to regional TAMs by Nov 5',
-          'Brief top 10 EMEA renewal accounts on the 99.95% SLA addendum once Legal signs off',
+          'Acknowledge handover and circulate DPDP compliance runbook to Mumbai & Bengaluru delivery squads by Nov 5',
+          'Brief top 10 Mumbai BFSI client sponsors on the 99.95% GenAI SLA addendum once Legal signs off',
         ],
         status: 'Pending Acknowledgment',
       },

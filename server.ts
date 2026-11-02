@@ -14,6 +14,7 @@ import {
   createTask,
   deleteMeeting,
   deleteTask,
+  executeCopilotTurn,
   extractMeetingDeterministic,
   resetToDemoState,
   updateMeeting,
@@ -41,7 +42,12 @@ function ensureDbLoaded(): AppDatabaseState {
     if (fs.existsSync(DB_FILE)) {
       const raw = fs.readFileSync(DB_FILE, 'utf-8');
       const parsed = JSON.parse(raw) as AppDatabaseState;
-      if (parsed && Array.isArray(parsed.meetings) && Array.isArray(parsed.tasks)) {
+      if (
+        parsed &&
+        Array.isArray(parsed.meetings) &&
+        Array.isArray(parsed.tasks) &&
+        parsed.scenarioName?.includes('PwC India')
+      ) {
         return parsed;
       }
     }
@@ -501,6 +507,90 @@ CRITICAL RULES:
       mimeType: null,
       engine: 'humanized-web-speech',
     });
+  });
+
+  // 11. Interactive Business AI Copilot Chatbot (Queries & Updates Live Meetings/Tasks)
+  app.post('/api/ai/chat', async (req, res) => {
+    const { message } = (req.body || {}) as {
+      message?: string;
+    };
+
+    const cleanMsg = (message || '').trim();
+    if (!cleanMsg) {
+      res.status(400).json({ error: 'Please enter a message for the Business AI Copilot.' });
+      return;
+    }
+
+    // First check if the user is requesting a live workspace mutation (complete task, carry forward, create task)
+    const deterministicTurn = executeCopilotTurn(dbState, cleanMsg);
+    if (deterministicTurn.executedAction) {
+      dbState = deterministicTurn.state;
+      saveDbState(dbState);
+      res.json(deterministicTurn);
+      return;
+    }
+
+    const ai = getGeminiClient();
+    if (ai) {
+      try {
+        const workspaceSnapshot = {
+          scenarioName: dbState.scenarioName,
+          participants: dbState.participants.map((p) => `${p.name} (${p.role}, ${p.department})`),
+          meetings: dbState.meetings.map((m) => ({
+            id: m.id,
+            title: m.title,
+            date: m.date,
+            aiSummary: m.aiSummary,
+          })),
+          tasks: dbState.tasks.map((t) => ({
+            id: t.id,
+            title: t.title,
+            owner: t.owner,
+            priority: t.priority,
+            deadline: t.deadline,
+            status: t.status,
+            sourceMeeting: t.sourceMeetingTitle,
+          })),
+          decisions: dbState.decisions.map((d) => `${d.summary} (${d.owner})`),
+          blockers: dbState.blockers.map((b) => `[${b.severity}] ${b.description} (${b.owner})`),
+          handovers: dbState.handovers.map(
+            (h) => `${h.title} (${h.fromPerson} -> ${h.toPerson}, Status: ${h.status})`
+          ),
+        };
+
+        const response = await withTimeout(
+          ai.models.generateContent({
+            model: 'gemini-3.8-flash',
+            contents: `Live PwC India Business AI Workspace State:\n${JSON.stringify(
+              workspaceSnapshot,
+              null,
+              2
+            )}\n\nUser Question: ${cleanMsg}`,
+            config: {
+              systemInstruction:
+                'You are the SyncMind Business AI Copilot for PwC India (supporting Ananya Sharma in Gurugram, Rohan Deshmukh in Bengaluru, and Priya Nair in Mumbai). Answer the user question concisely (2-5 bullet points or 2 short paragraphs) using exact facts, task owners, deadlines, decisions, and blockers from the provided live workspace state. Remind the user they can also ask you to mark tasks complete, carry forward overdue tasks into Part 2, or create new action items.',
+              thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+            },
+          }),
+          15000
+        );
+
+        const text = (response.text ?? '').trim();
+        if (text.length > 10) {
+          res.json({
+            reply: text,
+            executedAction: null,
+            state: dbState,
+            sourceEngine: 'gemini',
+          });
+          return;
+        }
+      } catch {
+        // Fall through cleanly to deterministic Copilot answer
+      }
+    }
+
+    res.json(deterministicTurn);
   });
 
   return app;
