@@ -19,7 +19,7 @@ import {
 } from './engine';
 import { createInitialSeedState } from './seedData';
 
-test('1. Initial Demo Seed State matches PwC India Q4 Business AI Review specification', () => {
+test('1. Initial Workspace Seed State matches PwC India Q4 Business AI Review specification', () => {
   const state = createInitialSeedState();
   assert.equal(
     state.scenarioName,
@@ -281,7 +281,7 @@ test('8. Report calculations, Handover acknowledgment, and AI Copilot actions wo
   assert.ok(report.byOwner.length >= 3);
 });
 
-test('9. Persistence serialization and Demo Reset restore exact initial baseline', () => {
+test('9. Persistence serialization and Baseline Reset restore exact initial baseline', () => {
   let state = createInitialSeedState();
   state = updateTaskStatus(state, 'task-4', 'completed');
   const serialized = JSON.stringify(state);

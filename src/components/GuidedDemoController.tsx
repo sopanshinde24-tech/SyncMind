@@ -136,15 +136,15 @@ export const GuidedDemoController: React.FC<GuidedDemoControllerProps> = ({
             >
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span>
-                Guided Demo Completed (Steps 1–9 executed on live state). Review the updated Weekly
-                Report below or click Reset Demo Data.
+                Guided Walkthrough Completed (Steps 1–9 executed on live state). Review the updated
+                Weekly Report below or click Reset Workspace Data.
               </span>
             </div>
           ) : (
             <p className="text-xs text-slate-400">
-              Click <strong className="text-white">Start Guided Demo</strong> to automatically walk
-              through transcript analysis, human review, task completion, carry-forward, and
-              executive reporting.
+              Click <strong className="text-white">Start Guided Walkthrough</strong> to
+              automatically walk through transcript analysis, human review, task completion,
+              carry-forward, and executive reporting.
             </p>
           )}
         </div>
@@ -159,7 +159,7 @@ export const GuidedDemoController: React.FC<GuidedDemoControllerProps> = ({
               className="px-3.5 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
             >
               <Play className="w-3.5 h-3.5 fill-current" />
-              Start Guided Demo
+              Start Guided Walkthrough
             </button>
           ) : (
             <>
@@ -190,7 +190,7 @@ export const GuidedDemoController: React.FC<GuidedDemoControllerProps> = ({
             className="px-3 py-1.5 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            Reset Demo Data
+            Reset Workspace Data
           </button>
 
           <button

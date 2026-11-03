@@ -156,7 +156,7 @@ erDiagram
 
 ---
 
-## 6. Demo Dataset (PwC India Scenario)
+## 6. Reference Dataset (PwC India Scenario)
 
 The application ships with the **"Scenario: PwC India — Q4 Business AI & GenAI Delivery Review"** dataset featuring:
 - **Participants**: Ananya Sharma (Director, Business AI Advisory · Gurugram), Rohan Deshmukh (Lead Business AI Engineer · Bengaluru), Priya Nair (Senior Manager, AI Governance & Delivery · Mumbai).

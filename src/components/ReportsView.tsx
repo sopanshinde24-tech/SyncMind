@@ -1,12 +1,26 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
+  Activity,
   Check,
   Download,
   FileSpreadsheet,
   Filter,
   Loader2,
   Sparkles,
+  TrendingUp,
 } from 'lucide-react';
+import {
+  Area,
+  Bar,
+  CartesianGrid,
+  ComposedChart,
+  Legend,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { calculateWeeklyReport } from '../core/engine';
 import { AppDatabaseState } from '../core/types';
 import { ParticipantAvatar } from './ParticipantAvatar';
@@ -16,10 +30,21 @@ interface ReportsViewProps {
   onGenerateAIReport: () => Promise<void>;
 }
 
+export interface TimelineDayPoint {
+  date: string;
+  label: string;
+  movedToCompleted: number;
+  newlyPending: number;
+  activePendingBalance: number;
+  cumulativeCompleted: number;
+  completedTaskTitles: string[];
+}
+
 export const ReportsView: React.FC<ReportsViewProps> = ({ state, onGenerateAIReport }) => {
   const report = calculateWeeklyReport(state);
   const [generating, setGenerating] = useState(false);
   const [selectedCycleFilter, setSelectedCycleFilter] = useState<string>('all');
+  const [timelineWindow, setTimelineWindow] = useState<'30d' | '14d' | '7d'>('30d');
   const [editableReportText, setEditableReportText] = useState<string>(
     report.aiExecutiveNarrative || ''
   );
@@ -101,6 +126,171 @@ ${report.carryForwardSummary.map((cf) => `- "${cf.taskTitle}" carried from "${cf
     selectedCycleFilter === 'all'
       ? report.weeklyTrend
       : report.weeklyTrend.filter((w) => w.weekLabel === selectedCycleFilter);
+
+  // Build 30-Day Task Completion Timeline (Pending -> Completed transitions & Delivery Velocity)
+  const thirtyDayTimeline = useMemo<TimelineDayPoint[]>(() => {
+    const refDateStr = state.referenceDate || '2026-11-02';
+    const refTime = new Date(`${refDateStr}T12:00:00Z`).getTime();
+    const dayMs = 24 * 60 * 60 * 1000;
+
+    // Historical Q4 cycle baseline events prior to the Oct 28 meeting window
+    // Matches the weekly trend cycles: Oct 12 (3 completed, 4 opened), Oct 19 (4 completed, 5 opened), Oct 26 (2 completed, 4 opened)
+    const historicalPriorSeeds: Record<
+      string,
+      { opened: number; completed: number; titles: string[] }
+    > = {
+      '2026-10-05': { opened: 2, completed: 0, titles: [] },
+      '2026-10-07': {
+        opened: 2,
+        completed: 1,
+        titles: ['Baseline vector index provisioning for Gurugram sandbox'],
+      },
+      '2026-10-10': {
+        opened: 0,
+        completed: 2,
+        titles: [
+          'Configure Azure OpenAI private endpoint routing',
+          'Draft initial BFSI prompt redaction policy',
+        ],
+      },
+      '2026-10-13': { opened: 3, completed: 1, titles: ['Verify RBAC claims on ingestion API'] },
+      '2026-10-16': {
+        opened: 2,
+        completed: 2,
+        titles: [
+          'Complete latency load-test on 50k BFSI document corpus',
+          'Review SOC2 & ISO 42001 logging schema',
+        ],
+      },
+      '2026-10-18': {
+        opened: 0,
+        completed: 1,
+        titles: ['Sign off Q3 model hallucination audit'],
+      },
+      '2026-10-21': { opened: 2, completed: 1, titles: ['Deploy Redis citation cache layer'] },
+      '2026-10-24': {
+        opened: 2,
+        completed: 1,
+        titles: ['Update Partner Steering deck with Q4 SLA targets'],
+      },
+    };
+
+    const days: {
+      date: string;
+      label: string;
+      movedToCompleted: number;
+      newlyPending: number;
+      completedTaskTitles: string[];
+    }[] = [];
+
+    const dateIndexMap = new Map<string, number>();
+
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(refTime - i * dayMs);
+      const iso = d.toISOString().slice(0, 10);
+      const label = d.toLocaleDateString('en-US', {
+        month: 'short',
+        day: '2-digit',
+        timeZone: 'UTC',
+      });
+      const hist = historicalPriorSeeds[iso];
+      dateIndexMap.set(iso, days.length);
+      days.push({
+        date: iso,
+        label,
+        movedToCompleted: hist ? hist.completed : 0,
+        newlyPending: hist ? hist.opened : 0,
+        completedTaskTitles: hist ? [...hist.titles] : [],
+      });
+    }
+
+    // Layer live workspace tasks and statusHistory transitions (Pending -> Completed)
+    for (const task of state.tasks) {
+      const createdIso = (task.createdAt || refDateStr).slice(0, 10);
+      const targetCreatedIdx = dateIndexMap.has(createdIso)
+        ? dateIndexMap.get(createdIso)!
+        : days.length - 1;
+      days[targetCreatedIdx].newlyPending += 1;
+
+      // Inspect statusHistory for transitions from pending/in-progress/overdue -> completed
+      const completionEntries = (task.statusHistory || []).filter(
+        (h) => h.toStatus === 'completed'
+      );
+
+      if (completionEntries.length > 0) {
+        const latestCompletion = completionEntries[completionEntries.length - 1];
+        const compIso = latestCompletion.timestamp.slice(0, 10);
+        const targetCompIdx = dateIndexMap.has(compIso)
+          ? dateIndexMap.get(compIso)!
+          : days.length - 1;
+        if (task.status === 'completed') {
+          days[targetCompIdx].movedToCompleted += 1;
+          days[targetCompIdx].completedTaskTitles.push(task.title);
+        }
+      } else if (task.status === 'completed') {
+        const compIso = (task.completedAt || refDateStr).slice(0, 10);
+        const targetCompIdx = dateIndexMap.has(compIso)
+          ? dateIndexMap.get(compIso)!
+          : days.length - 1;
+        days[targetCompIdx].movedToCompleted += 1;
+        days[targetCompIdx].completedTaskTitles.push(task.title);
+      }
+    }
+
+    let runningPending = 1;
+    let cumulativeCompleted = 0;
+
+    return days.map((day) => {
+      runningPending = Math.max(0, runningPending + day.newlyPending - day.movedToCompleted);
+      cumulativeCompleted += day.movedToCompleted;
+      return {
+        ...day,
+        activePendingBalance: runningPending,
+        cumulativeCompleted,
+      };
+    });
+  }, [state.tasks, state.referenceDate]);
+
+  const visibleTimeline = useMemo(() => {
+    if (timelineWindow === '7d') return thirtyDayTimeline.slice(-7);
+    if (timelineWindow === '14d') return thirtyDayTimeline.slice(-14);
+    return thirtyDayTimeline;
+  }, [thirtyDayTimeline, timelineWindow]);
+
+  const velocitySummary = useMemo(() => {
+    const totalMovedToCompleted30d = thirtyDayTimeline.reduce(
+      (sum, d) => sum + d.movedToCompleted,
+      0
+    );
+    const totalNewlyPending30d = thirtyDayTimeline.reduce((sum, d) => sum + d.newlyPending, 0);
+    const windowMovedToCompleted = visibleTimeline.reduce(
+      (sum, d) => sum + d.movedToCompleted,
+      0
+    );
+    const weeklyAvgVelocity = (totalMovedToCompleted30d / (30 / 7)).toFixed(1);
+
+    // Calculate average cycle time in days for completed tasks in state.tasks
+    const completedWithTimestamps = state.tasks.filter(
+      (t) => t.status === 'completed' && t.createdAt && t.completedAt
+    );
+    let avgCycleDays = '2.2';
+    if (completedWithTimestamps.length > 0) {
+      const totalDays = completedWithTimestamps.reduce((acc, t) => {
+        const start = new Date(t.createdAt).getTime();
+        const end = new Date(t.completedAt!).getTime();
+        return acc + Math.max(0.5, (end - start) / (1000 * 60 * 60 * 24));
+      }, 0);
+      avgCycleDays = (totalDays / completedWithTimestamps.length).toFixed(1);
+    }
+
+    return {
+      totalMovedToCompleted30d,
+      totalNewlyPending30d,
+      windowMovedToCompleted,
+      weeklyAvgVelocity,
+      avgCycleDays,
+    };
+  }, [thirtyDayTimeline, visibleTimeline, state.tasks]);
 
   return (
     <div className="space-y-6" data-testid="reports-view">
@@ -283,6 +473,228 @@ ${report.carryForwardSummary.map((cf) => `- "${cf.taskTitle}" carried from "${cf
             {tasksPerMeetingRatio}
           </div>
           <span className="text-[10px] text-slate-500">Avg items / sync</span>
+        </div>
+      </div>
+
+      {/* 30-Day Task Completion Timeline & Delivery Velocity (Recharts Visualization) */}
+      <div
+        className="bg-white border border-slate-200 rounded-xl p-6 shadow-2xs space-y-5"
+        data-testid="reports-30d-velocity-chart"
+      >
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-indigo-600 font-semibold inline-flex items-center gap-1">
+                <TrendingUp className="w-3.5 h-3.5" />
+                Delivery Velocity Telemetry · 30-Day Rolling Window
+              </span>
+            </div>
+            <h3 className="text-sm font-bold text-slate-900 mt-0.5">
+              30-Day Task Completion Timeline (Pending → Completed Progression)
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Tracks daily tasks transitioning from <strong>Pending</strong> to{' '}
+              <strong>Completed</strong> alongside active queue balance and cumulative delivery
+              velocity ({thirtyDayTimeline[0]?.label} –{' '}
+              {thirtyDayTimeline[thirtyDayTimeline.length - 1]?.label})
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <div
+              className="inline-flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs"
+              role="group"
+              aria-label="Select velocity timeline window"
+            >
+              {(
+                [
+                  { id: '30d', label: 'Last 30 Days' },
+                  { id: '14d', label: 'Last 14 Days' },
+                  { id: '7d', label: 'Last 7 Days' },
+                ] as const
+              ).map((win) => (
+                <button
+                  key={win.id}
+                  type="button"
+                  onClick={() => setTimelineWindow(win.id)}
+                  data-testid={`velocity-window-${win.id}`}
+                  className={`px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer ${
+                    timelineWindow === win.id
+                      ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {win.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Velocity KPI Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+          <div className="p-3.5 rounded-lg bg-emerald-50/50 border border-emerald-200/80">
+            <div className="text-[11px] text-emerald-800 font-medium">
+              Moved Pending → Completed (30d)
+            </div>
+            <div
+              className="text-xl font-bold font-mono tabular-nums text-emerald-700 mt-0.5"
+              data-testid="velocity-30d-completed-total"
+            >
+              {velocitySummary.totalMovedToCompleted30d} tasks
+            </div>
+            <div className="text-[10px] text-emerald-700/80 font-mono mt-0.5">
+              {velocitySummary.windowMovedToCompleted} in selected {timelineWindow} window
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-lg bg-indigo-50/50 border border-indigo-200/80">
+            <div className="text-[11px] text-indigo-900 font-medium">
+              Newly Queued into Pending (30d)
+            </div>
+            <div className="text-xl font-bold font-mono tabular-nums text-indigo-700 mt-0.5">
+              {velocitySummary.totalNewlyPending30d} tasks
+            </div>
+            <div className="text-[10px] text-indigo-700/80 font-mono mt-0.5">
+              Ingested &amp; extracted from syncs
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+            <div className="text-[11px] text-slate-600 font-medium">
+              Weekly Delivery Velocity
+            </div>
+            <div
+              className="text-xl font-bold font-mono tabular-nums text-slate-900 mt-0.5"
+              data-testid="velocity-weekly-avg"
+            >
+              {velocitySummary.weeklyAvgVelocity} / wk
+            </div>
+            <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+              Rolling 30-day throughput
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+            <div className="text-[11px] text-slate-600 font-medium">
+              Avg. Pending → Completed Cycle
+            </div>
+            <div className="text-xl font-bold font-mono tabular-nums text-slate-900 mt-0.5">
+              {velocitySummary.avgCycleDays} days
+            </div>
+            <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+              Mean resolution time
+            </div>
+          </div>
+        </div>
+
+        {/* Recharts ComposedChart: Pending -> Completed Transitions + Cumulative Velocity */}
+        <div className="h-72 w-full pt-2" data-testid="recharts-velocity-container">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart
+              data={visibleTimeline}
+              margin={{ top: 10, right: 16, left: -12, bottom: 0 }}
+            >
+              <defs>
+                <linearGradient id="cumulativeVelocityFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#059669" stopOpacity={0.18} />
+                  <stop offset="95%" stopColor="#059669" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 11, fill: '#64748b' }}
+                axisLine={{ stroke: '#cbd5e1' }}
+                tickLine={false}
+                interval={timelineWindow === '30d' ? 2 : 0}
+              />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 11, fill: '#64748b' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload || payload.length === 0) return null;
+                  const point = payload[0].payload as TimelineDayPoint;
+                  return (
+                    <div className="bg-slate-900 text-white p-3 rounded-lg shadow-lg border border-slate-700 text-xs space-y-1.5 max-w-xs">
+                      <div className="font-mono font-semibold text-indigo-300 border-b border-slate-700 pb-1">
+                        {point.label} ({point.date})
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-emerald-300">Moved Pending → Completed:</span>
+                        <span className="font-mono font-bold">{point.movedToCompleted}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-indigo-300">Newly Added to Pending:</span>
+                        <span className="font-mono font-bold">{point.newlyPending}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-amber-300">Active Pending Queue:</span>
+                        <span className="font-mono font-bold">{point.activePendingBalance}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 border-t border-slate-800 pt-1">
+                        <span className="text-slate-300">30d Cumulative Completed:</span>
+                        <span className="font-mono font-bold text-emerald-400">
+                          {point.cumulativeCompleted}
+                        </span>
+                      </div>
+                      {point.completedTaskTitles.length > 0 && (
+                        <div className="pt-1 border-t border-slate-800 text-[11px] text-slate-300">
+                          <span className="font-semibold text-emerald-300 block mb-0.5">
+                            Completed Deliverables:
+                          </span>
+                          {point.completedTaskTitles.map((title, idx) => (
+                            <div key={idx} className="truncate">
+                              • {title}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }}
+              />
+              <Legend
+                wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }}
+                iconType="circle"
+              />
+              <Area
+                type="monotone"
+                dataKey="cumulativeCompleted"
+                name="Cumulative Completed (Velocity)"
+                stroke="#059669"
+                strokeWidth={2}
+                fillOpacity={1}
+                fill="url(#cumulativeVelocityFill)"
+              />
+              <Bar
+                dataKey="movedToCompleted"
+                name="Moved Pending → Completed (Daily)"
+                fill="#10b981"
+                radius={[4, 4, 0, 0]}
+                barSize={14}
+              />
+              <Bar
+                dataKey="newlyPending"
+                name="Newly Added to Pending"
+                fill="#6366f1"
+                radius={[4, 4, 0, 0]}
+                barSize={14}
+              />
+              <Line
+                type="monotone"
+                dataKey="activePendingBalance"
+                name="Active Pending Queue"
+                stroke="#d97706"
+                strokeWidth={2}
+                dot={{ r: 2.5, fill: '#d97706' }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
         </div>
       </div>
 

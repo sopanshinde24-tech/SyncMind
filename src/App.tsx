@@ -173,7 +173,7 @@ export default function App() {
           nextState = await apiUpdateTaskStatus(
             targetTask.id,
             'completed',
-            'Completed during Guided Demo walkthrough.'
+            'Completed during Guided Walkthrough.'
           );
           setAppState(nextState);
         }
@@ -195,7 +195,7 @@ export default function App() {
             nextState = await apiCarryForwardTask(
               unfinishedFromPrev.id,
               targetMtgId,
-              'Carried forward into Part 2 review during Guided Demo.'
+              'Carried forward into Part 2 review during Guided Walkthrough.'
             );
             setAppState(nextState);
           } catch {
@@ -251,7 +251,7 @@ export default function App() {
         setIsRunningAuto(false);
         setGuidedStep(null);
         setDemoCompleted(true);
-        showToast('Guided Demo completed! All 9 workflow steps executed on live application data.');
+        showToast('Guided Walkthrough completed! All 9 workflow steps executed on live application data.');
       }
     }, 900);
 
@@ -324,7 +324,7 @@ export default function App() {
       if (demoRunIdRef.current !== runId) return;
       setGuidedStep(null);
       setDemoCompleted(true);
-      showToast('Guided Demo completed! All 9 workflow steps executed on live application data.');
+      showToast('Guided Walkthrough completed! All 9 workflow steps executed on live application data.');
     } finally {
       if (demoRunIdRef.current === runId) {
         setStepInProgress(false);
@@ -1019,7 +1019,7 @@ export default function App() {
                 onClick={handleResetDemoData}
                 className="hover:text-slate-900 underline cursor-pointer"
               >
-                Reset Demo Baseline
+                Reset Workspace Baseline
               </button>
               <span>Enterprise Workspace</span>
             </div>

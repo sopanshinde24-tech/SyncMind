@@ -203,7 +203,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   className="px-3.5 py-2 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg inline-flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  Reset Demo Baseline
+                  Reset Workspace Baseline
                 </button>
               </div>
             ) : (
