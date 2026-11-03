@@ -53,7 +53,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   );
   const pendingTasks = state.tasks.filter(
     (t) =>
-      t.status === 'pending' &&
+      (t.status === 'pending' || t.status === 'in-progress') &&
       (selectedMemberFilter === 'all' || t.owner === selectedMemberFilter)
   );
 

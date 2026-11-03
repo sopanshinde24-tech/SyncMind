@@ -27,6 +27,7 @@ interface CommandSearchModalProps {
       | 'tasks'
       | 'carry-forward'
       | 'handover'
+      | 'processing-history'
       | 'reports'
       | 'settings'
   ) => void;

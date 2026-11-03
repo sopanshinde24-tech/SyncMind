@@ -58,6 +58,23 @@ export function createInitialSeedState(): AppDatabaseState {
 [00:07:15] Priya Nair: For governance and client delivery in Mumbai, I will publish the Responsible AI & DPDP compliance runbook for BFSI client rollout by 2026-11-05.`,
         aiSummary:
           'PwC India Business AI leadership aligned on Q4 enterprise RAG resilience, DPDP Act compliance guardrails, and BFSI client SLA standards. The team decided to standardize enterprise GenAI SLA availability at 99.95% with grounded citation thresholds and freeze vector schema migrations during peak banking windows. Four core engineering and governance action items were assigned across Rohan, Ananya, and Priya, while a client InfoSec counter-signature blocker on the Mumbai telemetry audit was escalated.',
+        keyDiscussionPoints: [
+          'Mumbai cloud region RAG vector index failover readiness and sub-25ms p99 retrieval benchmark targets.',
+          'Standardizing enterprise GenAI availability SLA at 99.95% with grounded citation guardrails for BFSI clients.',
+          'Async BullMQ dead-letter worker migration to prevent large PDF regulatory filings from stalling retrieval.',
+          'DPDP Act & ISO 42001 compliance audit escalation and BFSI client rollout runbook.',
+        ],
+        dependencies: [
+          'Mumbai Legal contract redline review required before publishing the 99.95% GenAI SLA addendum.',
+          'Upstream BullMQ connector patch required for async dead-letter worker cutover.',
+        ],
+        openIssues: [
+          'DPDP Act & ISO 42001 external auditor sign-off on the Mumbai BFSI telemetry pipeline delayed awaiting client InfoSec counter-signature.',
+        ],
+        followUpRequirements: [
+          'Verify completion of Mumbai region RAG vector index latency benchmarks in the Nov 2 Part 2 Delivery Sync.',
+          'Escalate client InfoSec counter-signature to unblock DPDP & ISO 42001 audit.',
+        ],
         nextSteps: [
           'Verify completion of Mumbai region RAG vector index latency benchmarks',
           'Escalate client InfoSec counter-signature to unblock DPDP & ISO 42001 audit',
@@ -65,6 +82,15 @@ export function createInitialSeedState(): AppDatabaseState {
         ],
         aiAnalyzedAt: '2026-10-28T11:00:00Z',
         carriedTaskIds: [],
+        ingestionMetadata: {
+          inputType: 'transcript-analysis',
+          ingestedAt: '2026-10-28T09:55:00Z',
+          validationStatus: 'Valid',
+          validationNotes: [
+            'All required meeting fields, 3 participant records, 2 decisions, and 4 action items verified.',
+          ],
+          sourceFormat: 'Structured Transcript + Executive Notes',
+        },
         createdAt: '2026-10-28T09:55:00Z',
       },
       {
@@ -86,6 +112,15 @@ export function createInitialSeedState(): AppDatabaseState {
 [00:05:35] Priya Nair: I am already tracking the Q3 client UAT feedback logs audit for 2026-11-08. In addition, I will schedule executive AI governance walkthroughs with the top 10 Mumbai BFSI client sponsors by 2026-11-06. Priority is High.
 [00:06:20] Ananya Sharma: We also need someone to compile the consolidated Q4 Partner steering deck token FinOps cost forecast, though we haven't assigned an owner or exact due date yet. Also note a new blocker: Production API rate-limit sandbox testing for our Mumbai private sector bank client is blocked by pending RBI cloud firewall IP whitelisting from their infosec team.`,
         carriedTaskIds: [],
+        ingestionMetadata: {
+          inputType: 'manual',
+          ingestedAt: '2026-11-02T09:00:00Z',
+          validationStatus: 'Valid',
+          validationNotes: [
+            'Meeting metadata, 3 participants, and 7-line verbatim transcript ingested. Ready for AI extraction.',
+          ],
+          sourceFormat: 'Live Meeting Transcript Stream',
+        },
         createdAt: '2026-11-02T09:00:00Z',
       },
     ],
@@ -99,6 +134,7 @@ export function createInitialSeedState(): AppDatabaseState {
         priority: 'High',
         deadline: '2026-10-30',
         status: 'completed',
+        dependencies: ['Mumbai multi-zone cloud cluster provisioning'],
         sourceMeetingId: 'mtg-q4-ops-1',
         sourceMeetingTitle:
           'PwC India Business AI Review — Part 1: Enterprise RAG Architecture & Guardrails',
@@ -134,6 +170,7 @@ export function createInitialSeedState(): AppDatabaseState {
         priority: 'High',
         deadline: '2026-10-31',
         status: 'overdue',
+        dependencies: ['Upstream BullMQ connector patch'],
         sourceMeetingId: 'mtg-q4-ops-1',
         sourceMeetingTitle:
           'PwC India Business AI Review — Part 1: Enterprise RAG Architecture & Guardrails',
@@ -168,6 +205,7 @@ export function createInitialSeedState(): AppDatabaseState {
         priority: 'High',
         deadline: '2026-11-01',
         status: 'overdue',
+        dependencies: ['Mumbai Legal clause redline approval'],
         sourceMeetingId: 'mtg-q4-ops-1',
         sourceMeetingTitle:
           'PwC India Business AI Review — Part 1: Enterprise RAG Architecture & Guardrails',
@@ -202,6 +240,7 @@ export function createInitialSeedState(): AppDatabaseState {
         priority: 'Medium',
         deadline: '2026-11-05',
         status: 'pending',
+        dependencies: ['ISO 42001 & DPDP telemetry sign-off'],
         sourceMeetingId: 'mtg-q4-ops-1',
         sourceMeetingTitle:
           'PwC India Business AI Review — Part 1: Enterprise RAG Architecture & Guardrails',
@@ -229,6 +268,7 @@ export function createInitialSeedState(): AppDatabaseState {
         priority: 'Low',
         deadline: '2026-11-08',
         status: 'pending',
+        dependencies: ['Q3 UAT telemetry export'],
         sourceMeetingId: 'mtg-q4-ops-2',
         sourceMeetingTitle:
           'PwC India Business AI Review — Part 2: Production Rollout & Client Handover Sync',
@@ -318,6 +358,40 @@ export function createInitialSeedState(): AppDatabaseState {
           'Brief top 10 Mumbai BFSI client sponsors on the 99.95% GenAI SLA addendum once Legal signs off',
         ],
         status: 'Pending Acknowledgment',
+      },
+    ],
+    processingHistory: [
+      {
+        id: 'proc-seed-1',
+        meetingId: 'mtg-q4-ops-1',
+        meetingTitle:
+          'PwC India Business AI Review — Part 1: Enterprise RAG Architecture & Guardrails',
+        timestamp: '2026-10-28T11:00:00Z',
+        inputType: 'transcript-analysis',
+        extractionStatus: 'Completed',
+        sourceEngine: 'gemini',
+        decisionsExtracted: 2,
+        actionItemsExtracted: 4,
+        validationStatus: 'Valid',
+        errors: [],
+        warnings: [],
+      },
+      {
+        id: 'proc-seed-2',
+        meetingId: 'mtg-q4-ops-2',
+        meetingTitle:
+          'PwC India Business AI Review — Part 2: Production Rollout & Client Handover Sync',
+        timestamp: '2026-11-02T09:00:00Z',
+        inputType: 'manual',
+        extractionStatus: 'Ingested (Pending Extraction)',
+        sourceEngine: 'ingestion-validator',
+        decisionsExtracted: 0,
+        actionItemsExtracted: 1,
+        validationStatus: 'Valid',
+        errors: [],
+        warnings: [
+          'Meeting transcript ingested (7 speaker turns); awaiting AI extraction and human approval.',
+        ],
       },
     ],
   };

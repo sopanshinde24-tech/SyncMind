@@ -9,6 +9,7 @@ import {
   deleteTask,
   executeCopilotTurn,
   extractMeetingDeterministic,
+  ingestMeetingData,
   resetToDemoState,
   updateMeeting,
   updateTask,
@@ -34,6 +35,9 @@ export function loadLocalMirror(): AppDatabaseState {
     if (raw) {
       const parsed = JSON.parse(raw) as AppDatabaseState;
       if (parsed && Array.isArray(parsed.meetings) && Array.isArray(parsed.tasks)) {
+        if (!Array.isArray(parsed.processingHistory)) {
+          parsed.processingHistory = createInitialSeedState().processingHistory;
+        }
         return parsed;
       }
     }
@@ -88,7 +92,32 @@ export async function apiCreateMeeting(payload: {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Failed to create meeting' }));
+    if (err.state) {
+      saveLocalMirror(err.state);
+    }
     throw new Error(err.error || 'Failed to create meeting');
+  }
+  const data = (await res.json()) as AppDatabaseState;
+  saveLocalMirror(data);
+  return data;
+}
+
+export async function apiIngestMeetingData(payload: {
+  format: 'txt' | 'csv' | 'json';
+  rawContent: string;
+  autoExtract?: boolean;
+}): Promise<AppDatabaseState> {
+  const res = await fetch('/api/meetings/ingest', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Failed to ingest meeting data' }));
+    if (err.state) {
+      saveLocalMirror(err.state);
+    }
+    throw new Error(err.error || 'Failed to ingest meeting data');
   }
   const data = (await res.json()) as AppDatabaseState;
   saveLocalMirror(data);
@@ -185,6 +214,7 @@ export async function apiCreateTask(payload: {
   owner?: string;
   priority?: TaskPriority;
   deadline?: string;
+  dependencies?: string[];
   sourceMeetingId: string;
 }): Promise<AppDatabaseState> {
   const res = await fetch('/api/tasks', {
@@ -210,6 +240,7 @@ export async function apiUpdateTask(
     priority: TaskPriority;
     deadline: string;
     status: TaskStatus;
+    dependencies: string[];
   }>
 ): Promise<AppDatabaseState> {
   const res = await fetch(`/api/tasks/${taskId}`, {
@@ -358,6 +389,7 @@ export async function apiSendCopilotMessage(message: string): Promise<CopilotTur
 
 export {
   createMeeting,
+  ingestMeetingData,
   updateMeeting,
   deleteMeeting,
   createTask,
@@ -367,4 +399,3 @@ export {
   createHandover,
   acknowledgeHandover,
 };
-

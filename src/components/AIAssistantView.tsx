@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   CornerDownRight,
   FileCheck2,
+  GitBranch,
   History,
   Loader2,
   Plus,
@@ -163,20 +164,26 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
     (t) => t.sourceMeetingId !== selectedMeetingId && t.status !== 'completed'
   );
 
+  const incompleteItemsCount = draft
+    ? draft.actionItems.filter(
+        (a) => a.owner === 'Unassigned' || a.deadline === 'Unspecified'
+      ).length + draft.decisions.filter((d) => d.owner === 'Unspecified').length
+    : 0;
+
   return (
     <div className="space-y-6" data-testid="ai-assistant-view">
       {/* Top Info Bar */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
         <div>
           <span className="text-xs font-mono uppercase tracking-wider text-violet-600 font-semibold">
-            AI Meeting Intelligence · Human-in-the-Loop Governance
+            AI Meeting Intelligence · Schema-Validated Extraction
           </span>
           <h2 className="text-lg font-bold text-slate-900 mt-0.5">
-            Structured Transcript Extraction &amp; Verification
+            Structured Transcript Processing, Validation &amp; Human Review
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Extract summaries, key insights, decisions, tasks, and follow-ups. Missing owners or
-            dates are strictly flagged as{' '}
+            Extract summaries, discussion points, decisions, action items, dependencies, open
+            issues, and follow-up requirements. Missing owners or dates are strictly flagged as{' '}
             <span className="font-mono text-amber-800 font-semibold">Unassigned</span> or{' '}
             <span className="font-mono text-amber-800 font-semibold">Unspecified</span> until
             human-confirmed.
@@ -386,24 +393,64 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
                 </button>
               </div>
 
-              {/* 1. Editable Summary */}
-              <div className="p-5">
-                <div className="flex items-center justify-between mb-1.5">
-                  <label
-                    htmlFor="review-summary-input"
-                    className="block text-xs font-semibold text-slate-700"
-                  >
-                    1. Meeting Summary &amp; Key Insights
-                  </label>
-                  <span className="text-[11px] font-mono text-violet-600">Editable Draft</span>
+              {/* Pre-Save Data Validation Banner */}
+              <div
+                className={`px-5 py-3 text-xs flex items-center justify-between gap-3 ${
+                  incompleteItemsCount > 0
+                    ? 'bg-amber-50/80 text-amber-900'
+                    : 'bg-emerald-50/70 text-emerald-900'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {incompleteItemsCount > 0 ? (
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  )}
+                  <span>
+                    {incompleteItemsCount > 0
+                      ? `Validation Notice: ${incompleteItemsCount} extracted item(s) have Unassigned owners or Unspecified dates in the source transcript. Review or assign below before saving.`
+                      : 'Pre-Save Schema Validation Passed: All extracted owners and ISO dates are explicitly specified.'}
+                  </span>
                 </div>
-                <textarea
-                  id="review-summary-input"
-                  rows={3}
-                  value={draft.summary}
-                  onChange={(e) => setDraft({ ...draft, summary: e.target.value })}
-                  className="w-full p-3 text-sm text-slate-800 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 leading-relaxed"
-                />
+                <span className="font-mono text-[11px] shrink-0">
+                  {incompleteItemsCount > 0 ? 'REVIEW RECOMMENDED' : 'VALID'}
+                </span>
+              </div>
+
+              {/* 1. Editable Summary & Key Discussion Points */}
+              <div className="p-5 space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label
+                      htmlFor="review-summary-input"
+                      className="block text-xs font-semibold text-slate-700"
+                    >
+                      1. Meeting Summary
+                    </label>
+                    <span className="text-[11px] font-mono text-violet-600">Editable Draft</span>
+                  </div>
+                  <textarea
+                    id="review-summary-input"
+                    rows={3}
+                    value={draft.summary}
+                    onChange={(e) => setDraft({ ...draft, summary: e.target.value })}
+                    className="w-full p-3 text-sm text-slate-800 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 leading-relaxed"
+                  />
+                </div>
+
+                {draft.keyDiscussionPoints && draft.keyDiscussionPoints.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-semibold text-slate-700 mb-1.5">
+                      Key Discussion Points ({draft.keyDiscussionPoints.length})
+                    </h4>
+                    <ul className="space-y-1 text-xs text-slate-700 list-disc list-inside bg-slate-50 p-3 rounded-lg border border-slate-200">
+                      {draft.keyDiscussionPoints.map((pt, idx) => (
+                        <li key={idx}>{pt}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               {/* 2. Extracted Decisions */}
@@ -570,11 +617,46 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
                 </div>
               </div>
 
-              {/* 4. Blockers & Suggested Follow-ups */}
+              {/* 4. Dependencies & Open Issues */}
+              <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
+                    <GitBranch className="w-3.5 h-3.5 text-indigo-600" />
+                    4. Dependencies ({draft.dependencies?.length || 0})
+                  </h3>
+                  {draft.dependencies && draft.dependencies.length > 0 ? (
+                    <ul className="space-y-1.5 text-xs text-slate-700 list-disc list-inside bg-slate-50 p-3 rounded-lg border border-slate-200">
+                      {draft.dependencies.map((dep, i) => (
+                        <li key={i}>{dep}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-slate-500">No explicit dependencies identified.</p>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                    5. Open Issues ({draft.openIssues?.length || 0})
+                  </h3>
+                  {draft.openIssues && draft.openIssues.length > 0 ? (
+                    <ul className="space-y-1.5 text-xs text-slate-700 list-disc list-inside bg-amber-50/40 p-3 rounded-lg border border-amber-200">
+                      {draft.openIssues.map((iss, i) => (
+                        <li key={i}>{iss}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-slate-500">No open issues identified.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* 5. Blockers & Follow-up Requirements */}
               <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <h3 className="text-xs font-semibold text-slate-700 mb-2">
-                    4. Operational Blockers ({draft.blockers.length})
+                    6. Operational Blockers ({draft.blockers.length})
                   </h3>
                   {draft.blockers.length > 0 ? (
                     <div className="space-y-2">
@@ -600,10 +682,10 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
 
                 <div>
                   <h3 className="text-xs font-semibold text-slate-700 mb-2">
-                    5. Suggested Follow-Ups &amp; Next Steps
+                    7. Follow-Up Requirements &amp; Next Steps
                   </h3>
                   <ul className="space-y-1.5 text-xs text-slate-700 list-disc list-inside bg-slate-50 p-3 rounded-lg border border-slate-200">
-                    {draft.nextSteps.map((step, i) => (
+                    {(draft.followUpRequirements || draft.nextSteps).map((step, i) => (
                       <li key={i}>{step}</li>
                     ))}
                   </ul>
@@ -621,8 +703,8 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
               <p className="mt-1.5 text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
                 Select a meeting on the left or paste any meeting transcript, then click{' '}
                 <strong>Run AI Meeting Analysis</strong> to generate a source-grounded summary,
-                decisions, action items, owners, deadlines, and suggested follow-ups for human
-                review.
+                discussion points, decisions, action items, dependencies, open issues, and
+                follow-up requirements for human review.
               </p>
               <button
                 type="button"

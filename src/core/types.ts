@@ -1,5 +1,6 @@
 export type TaskPriority = 'High' | 'Medium' | 'Low';
-export type TaskStatus = 'pending' | 'completed' | 'overdue';
+export type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'overdue';
+export type IngestionInputType = 'manual' | 'txt' | 'csv' | 'json' | 'transcript-analysis';
 
 export interface Participant {
   id: string;
@@ -27,6 +28,7 @@ export interface ActionItem {
   priority: TaskPriority;
   deadline: string; // YYYY-MM-DD or "Unspecified"
   status: TaskStatus;
+  dependencies?: string[];
   sourceMeetingId: string;
   sourceMeetingTitle: string;
   currentMeetingId: string;
@@ -58,6 +60,14 @@ export interface Blocker {
   reportedAt: string;
 }
 
+export interface IngestionMetadata {
+  inputType: IngestionInputType;
+  ingestedAt: string;
+  validationStatus: 'Valid' | 'Warning' | 'Failed';
+  validationNotes: string[];
+  sourceFormat?: string;
+}
+
 export interface Meeting {
   id: string;
   title: string;
@@ -69,9 +79,14 @@ export interface Meeting {
   notes: string;
   transcript: string;
   aiSummary?: string;
+  keyDiscussionPoints?: string[];
+  dependencies?: string[];
+  openIssues?: string[];
+  followUpRequirements?: string[];
   nextSteps?: string[];
   aiAnalyzedAt?: string;
   carriedTaskIds: string[];
+  ingestionMetadata?: IngestionMetadata;
   createdAt: string;
 }
 
@@ -113,6 +128,7 @@ export interface AIExtractedTaskDraft {
   owner: string;
   priority: TaskPriority;
   deadline: string;
+  dependencies?: string[];
 }
 
 export interface AIExtractedDecisionDraft {
@@ -129,22 +145,74 @@ export interface AIExtractedBlockerDraft {
 
 export interface AIAnalysisResult {
   summary: string;
+  keyDiscussionPoints?: string[];
   decisions: AIExtractedDecisionDraft[];
   actionItems: AIExtractedTaskDraft[];
   blockers: AIExtractedBlockerDraft[];
+  dependencies?: string[];
+  openIssues?: string[];
+  followUpRequirements?: string[];
   nextSteps: string[];
+  validationWarnings?: string[];
   sourceEngine: 'gemini' | 'deterministic-fallback';
   analyzedAt: string;
+}
+
+export interface ProcessingLogEntry {
+  id: string;
+  meetingId: string;
+  meetingTitle: string;
+  timestamp: string;
+  inputType: IngestionInputType;
+  extractionStatus: 'Completed' | 'Ingested (Pending Extraction)' | 'Review Required' | 'Failed';
+  sourceEngine: 'gemini' | 'deterministic-fallback' | 'ingestion-validator';
+  decisionsExtracted: number;
+  actionItemsExtracted: number;
+  validationStatus: 'Valid' | 'Warning' | 'Failed';
+  errors: string[];
+  warnings: string[];
+}
+
+export interface DataQualityIssue {
+  id: string;
+  category:
+    | 'Required Field'
+    | 'Duplicate Detection'
+    | 'Date Format'
+    | 'Owner Validation'
+    | 'Relationship Integrity'
+    | 'AI Output Validation';
+  severity: 'Warning' | 'Error';
+  entityType: 'Meeting' | 'ActionItem' | 'Decision' | 'FollowUp';
+  entityId: string;
+  entityTitle: string;
+  message: string;
+}
+
+export interface DataQualityReport {
+  evaluatedAt: string;
+  overallStatus: 'Healthy' | 'Attention Needed' | 'Critical Issues';
+  totalRecordsChecked: number;
+  validRecordsCount: number;
+  warningCount: number;
+  errorCount: number;
+  duplicateActionItemsDetected: number;
+  unassignedTasksCount: number;
+  unspecifiedDatesCount: number;
+  orphanedRelationshipsCount: number;
+  issues: DataQualityIssue[];
 }
 
 export interface DashboardMetrics {
   totalMeetings: number;
   totalTasks: number;
-  openTasks: number; // pending + overdue
+  openTasks: number; // pending + in-progress + overdue
   pendingTasks: number;
+  inProgressTasks?: number;
   completedTasks: number;
   overdueTasks: number;
   completionRate: number; // 0-100 integer
+  followUpCompletionRate?: number; // 0-100 integer
   totalDecisions: number;
   activeBlockers: number;
   carriedForwardCount: number;
@@ -159,6 +227,7 @@ export interface WeeklyReportData {
   byOwner: Array<{
     owner: string;
     completed: number;
+    inProgress?: number;
     pending: number;
     overdue: number;
     total: number;
@@ -187,6 +256,7 @@ export interface AppDatabaseState {
   blockers: Blocker[];
   carryForwardHistory: CarryForwardRecord[];
   handovers: HandoverRecord[];
+  processingHistory?: ProcessingLogEntry[];
   savedReportNarrative?: string;
   lastUpdated: string;
 }

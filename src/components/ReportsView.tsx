@@ -184,76 +184,105 @@ ${report.carryForwardSummary.map((cf) => `- "${cf.taskTitle}" carried from "${cf
         </div>
       )}
 
-      {/* 6 Summary KPI Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
-          <span className="text-xs text-slate-500">Completion Rate</span>
+      {/* Feature F — Comprehensive Meeting & Workflow Analytics KPI Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3.5">
+        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
+          <span className="text-[11px] text-slate-500">Total Meetings</span>
           <div
-            className="mt-1 text-2xl font-bold text-slate-900 font-mono tabular-nums"
-            data-testid="report-completion-rate"
+            className="mt-1 text-xl font-bold text-slate-900 font-mono tabular-nums"
+            data-testid="report-total-meetings"
           >
-            {report.metrics.completionRate}%
+            {report.metrics.totalMeetings}
           </div>
-          <span className="text-[11px] text-slate-500 font-mono tabular-nums">
-            {report.metrics.completedTasks} of {report.metrics.totalTasks} tasks
+          <span className="text-[10px] text-slate-500 font-mono tabular-nums">
+            {tasksPerMeetingRatio} tasks / mtg
           </span>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
-          <span className="text-xs text-slate-500">Completed Tasks</span>
+        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
+          <span className="text-[11px] text-slate-500">Decisions Recorded</span>
           <div
-            className="mt-1 text-2xl font-bold text-emerald-700 font-mono tabular-nums"
-            data-testid="report-completed-count"
-          >
-            {report.metrics.completedTasks}
-          </div>
-          <span className="text-[11px] text-slate-500">Verified closed</span>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
-          <span className="text-xs text-slate-500">Overdue Items</span>
-          <div
-            className="mt-1 text-2xl font-bold text-red-600 font-mono tabular-nums"
-            data-testid="report-overdue-count"
-          >
-            {report.metrics.overdueTasks}
-          </div>
-          <span className="text-[11px] text-slate-500">Past target deadline</span>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
-          <span className="text-xs text-slate-500">Carried Forward</span>
-          <div
-            className="mt-1 text-2xl font-bold text-indigo-600 font-mono tabular-nums"
-            data-testid="report-carried-count"
-          >
-            {report.metrics.carriedForwardCount}
-          </div>
-          <span className="text-[11px] text-slate-500">Follow-up lineage</span>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
-          <span className="text-xs text-slate-500">Decisions Logged</span>
-          <div
-            className="mt-1 text-2xl font-bold text-slate-900 font-mono tabular-nums"
+            className="mt-1 text-xl font-bold text-slate-900 font-mono tabular-nums"
             data-testid="report-decisions-count"
           >
             {report.metrics.totalDecisions}
           </div>
-          <span className="text-[11px] text-slate-500">
-            Across {report.metrics.totalMeetings} meetings
+          <span className="text-[10px] text-slate-500">Source-verified</span>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
+          <span className="text-[11px] text-slate-500">Action Items Gen.</span>
+          <div
+            className="mt-1 text-xl font-bold text-indigo-700 font-mono tabular-nums"
+            data-testid="report-total-tasks"
+          >
+            {report.metrics.totalTasks}
+          </div>
+          <span className="text-[10px] text-slate-500">Total extracted</span>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
+          <span className="text-[11px] text-slate-500">Open Action Items</span>
+          <div
+            className="mt-1 text-xl font-bold text-amber-700 font-mono tabular-nums"
+            data-testid="report-open-tasks"
+          >
+            {report.metrics.openTasks}
+          </div>
+          <span className="text-[10px] text-slate-500 font-mono">
+            {report.metrics.pendingTasks} active
           </span>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
-          <span className="text-xs text-slate-500">Meeting-to-Task Ratio</span>
+        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
+          <span className="text-[11px] text-slate-500">Completed Tasks</span>
           <div
-            className="mt-1 text-2xl font-bold text-violet-700 font-mono tabular-nums"
+            className="mt-1 text-xl font-bold text-emerald-700 font-mono tabular-nums"
+            data-testid="report-completed-count"
+          >
+            {report.metrics.completedTasks}
+          </div>
+          <span
+            className="text-[10px] text-slate-500 font-mono"
+            data-testid="report-completion-rate"
+          >
+            {report.metrics.completionRate}% rate
+          </span>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
+          <span className="text-[11px] text-slate-500">Overdue Tasks</span>
+          <div
+            className="mt-1 text-xl font-bold text-red-600 font-mono tabular-nums"
+            data-testid="report-overdue-count"
+          >
+            {report.metrics.overdueTasks}
+          </div>
+          <span className="text-[10px] text-slate-500">Past due date</span>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
+          <span className="text-[11px] text-slate-500">Carried Follow-Ups</span>
+          <div
+            className="mt-1 text-xl font-bold text-indigo-600 font-mono tabular-nums"
+            data-testid="report-carried-count"
+          >
+            {report.metrics.carriedForwardCount}
+          </div>
+          <span className="text-[10px] text-slate-500 font-mono">
+            {report.metrics.followUpCompletionRate ?? report.metrics.completionRate}% follow-up rate
+          </span>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
+          <span className="text-[11px] text-slate-500">Task / Mtg Ratio</span>
+          <div
+            className="mt-1 text-xl font-bold text-violet-700 font-mono tabular-nums"
             data-testid="report-conversion-ratio"
           >
             {tasksPerMeetingRatio}
           </div>
-          <span className="text-[11px] text-slate-500">Tasks extracted / mtg</span>
+          <span className="text-[10px] text-slate-500">Avg items / sync</span>
         </div>
       </div>
 

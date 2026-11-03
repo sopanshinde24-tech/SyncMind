@@ -5,13 +5,18 @@ import {
   CheckCircle2,
   Clock,
   CornerDownRight,
+  Database,
   Edit3,
   FileCheck2,
+  FileSpreadsheet,
   FileText,
+  GitBranch,
   Plus,
   Search,
+  ShieldCheck,
   Sparkles,
   Trash2,
+  Upload,
   Users,
   X,
 } from 'lucide-react';
@@ -31,6 +36,11 @@ interface MeetingsViewProps {
     agenda: string;
     notes: string;
     transcript: string;
+  }) => Promise<void>;
+  onIngestMeeting?: (payload: {
+    format: 'txt' | 'csv' | 'json';
+    rawContent: string;
+    autoExtract: boolean;
   }) => Promise<void>;
   onUpdateMeeting: (
     id: string,
@@ -52,11 +62,59 @@ interface MeetingsViewProps {
   onOpenAIAssistant: (meetingId: string) => void;
 }
 
+const SAMPLE_TXT_PAYLOAD = `Title: PwC India BFSI GenAI Security & RBI Firewall Sync
+Date: 2026-11-05
+Participants: Ananya Sharma, Rohan Deshmukh, Priya Nair
+Agenda: 1. Unblock RBI cloud firewall IP whitelisting 2. Validate DPDP telemetry encryption
+Notes: Urgent security sync between Gurugram, Bengaluru, and Mumbai teams.
+[00:00:12] Ananya Sharma: Decision made: We will enforce mutual TLS and static egress IP whitelisting for all Mumbai private sector bank RAG endpoints starting 2026-11-08.
+[00:01:05] Rohan Deshmukh: Action item for me: I will configure the dedicated NAT gateway egress IP pool for the Mumbai BFSI cluster by 2026-11-06. Priority is High.
+[00:02:10] Priya Nair: I will share the updated RBI cloud firewall compliance attestation packet with client InfoSec by 2026-11-07.`;
+
+const SAMPLE_CSV_PAYLOAD = `title,date,participants,agenda,decision,actionItem,owner,priority,deadline
+"PwC India Q4 FinOps & Token Cost Optimization Sync",2026-11-06,"Ananya Sharma|Rohan Deshmukh|Priya Nair","1. Review Q4 Gemini token utilization 2. Approve semantic caching tier","Enable Redis semantic response caching for repetitive BFSI compliance queries","Deploy semantic cache layer on Bengaluru staging cluster","Rohan Deshmukh",High,2026-11-08
+"PwC India Q4 FinOps & Token Cost Optimization Sync",2026-11-06,"Ananya Sharma|Rohan Deshmukh|Priya Nair","1. Review Q4 Gemini token utilization 2. Approve semantic caching tier","","Publish monthly FinOps token budget allocation per Partner practice","Ananya Sharma",Medium,2026-11-09`;
+
+const SAMPLE_JSON_PAYLOAD = JSON.stringify(
+  {
+    title: 'PwC India Responsible AI Red-Team & Guardrails Review',
+    date: '2026-11-07',
+    startTime: '02:30 PM',
+    durationMinutes: 45,
+    participants: ['Ananya Sharma', 'Rohan Deshmukh', 'Priya Nair'],
+    agenda:
+      '1. Evaluate prompt-injection red-team results\n2. Sign off on DPDP PII redaction filter',
+    notes: 'All 120 adversarial prompt injection test cases were blocked by the input guardrail.',
+    transcript:
+      '[00:00:20] Priya Nair: Decision made: We will mandate automated PII regex + NER redaction before any prompt reaches the embedding pipeline.\n[00:01:15] Rohan Deshmukh: I will integrate the PII redaction middleware into the Mumbai production gateway by 2026-11-09. Priority is High.',
+    decisions: [
+      {
+        summary:
+          'Mandate automated PII regex and NER redaction before any prompt reaches the embedding pipeline.',
+        owner: 'Priya Nair',
+        impactArea: 'AI Governance & DPDP Compliance',
+      },
+    ],
+    actionItems: [
+      {
+        title: 'Integrate PII redaction middleware into Mumbai production gateway',
+        description: 'Enforce pre-embedding PII stripping across all BFSI endpoints.',
+        owner: 'Rohan Deshmukh',
+        priority: 'High',
+        deadline: '2026-11-09',
+      },
+    ],
+  },
+  null,
+  2
+);
+
 export const MeetingsView: React.FC<MeetingsViewProps> = ({
   state,
   selectedMeetingId,
   onSelectMeeting,
   onCreateMeeting,
+  onIngestMeeting,
   onUpdateMeeting,
   onDeleteMeeting,
   onOpenAIAssistant,
@@ -88,6 +146,7 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
     state.meetings[0] ||
     null;
 
+  // Manual Create/Edit Modal State
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingMeetingId, setEditingMeetingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
@@ -102,6 +161,14 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
   const [transcript, setTranscript] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Multi-Format Data Ingestion Modal State (TXT / CSV / JSON)
+  const [isIngestOpen, setIsIngestOpen] = useState(false);
+  const [ingestFormat, setIngestFormat] = useState<'txt' | 'csv' | 'json'>('txt');
+  const [ingestContent, setIngestContent] = useState(SAMPLE_TXT_PAYLOAD);
+  const [autoExtractOnIngest, setAutoExtractOnIngest] = useState(true);
+  const [ingestError, setIngestError] = useState<string | null>(null);
+  const [ingesting, setIngesting] = useState(false);
 
   const openCreateModal = () => {
     setEditingMeetingId(null);
@@ -129,6 +196,54 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
     setTranscript(meeting.transcript);
     setFormError(null);
     setIsFormOpen(true);
+  };
+
+  const handleFormatSwitch = (fmt: 'txt' | 'csv' | 'json') => {
+    setIngestFormat(fmt);
+    setIngestError(null);
+    if (fmt === 'txt') setIngestContent(SAMPLE_TXT_PAYLOAD);
+    else if (fmt === 'csv') setIngestContent(SAMPLE_CSV_PAYLOAD);
+    else setIngestContent(SAMPLE_JSON_PAYLOAD);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext === 'csv') setIngestFormat('csv');
+    else if (ext === 'json') setIngestFormat('json');
+    else setIngestFormat('txt');
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const content = typeof ev.target?.result === 'string' ? ev.target.result : '';
+      setIngestContent(content);
+      setIngestError(null);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleIngestSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onIngestMeeting) return;
+    setIngestError(null);
+    if (!ingestContent.trim()) {
+      setIngestError('Please provide TXT, CSV, or JSON content to ingest.');
+      return;
+    }
+    setIngesting(true);
+    try {
+      await onIngestMeeting({
+        format: ingestFormat,
+        rawContent: ingestContent,
+        autoExtract: autoExtractOnIngest,
+      });
+      setIsIngestOpen(false);
+    } catch (err: unknown) {
+      setIngestError(err instanceof Error ? err.message : 'Failed to ingest meeting data.');
+    } finally {
+      setIngesting(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -216,24 +331,40 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 rounded-xl p-5 shadow-2xs">
         <div>
           <span className="text-xs font-mono uppercase tracking-wider text-indigo-600 font-semibold">
-            Meeting Management Workspace
+            Meeting Data Ingestion &amp; Workspace
           </span>
           <h2 className="text-lg font-bold text-slate-900 mt-0.5">
-            Meetings, Verbatim Transcripts &amp; Decisions
+            Meetings, Multi-Format Ingestion (TXT / CSV / JSON) &amp; Verbatim Transcripts
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Inspect structured meeting agendas, transcripts, AI summaries, decisions, and action
-            items
+            Ingest structured or unstructured meeting records, validate metadata &amp; duplicate
+            submissions, and inspect AI-extracted decisions and tasks
           </p>
         </div>
-        <button
-          type="button"
-          onClick={openCreateModal}
-          className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          New Meeting Record
-        </button>
+        <div className="flex items-center gap-2.5 shrink-0">
+          {onIngestMeeting && (
+            <button
+              type="button"
+              onClick={() => {
+                setIngestError(null);
+                setIsIngestOpen(true);
+              }}
+              data-testid="open-ingest-modal-btn"
+              className="px-3.5 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Ingest TXT / CSV / JSON
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            New Meeting Record
+          </button>
+        </div>
       </div>
 
       {/* Main Split View: Left Meeting List (4 cols) + Right Meeting Detail (8 cols) */}
@@ -373,6 +504,8 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
                         {activeMeeting.startTime} ({activeMeeting.durationMinutes} min)
                       </span>
                       <span aria-hidden="true">·</span>
+                      <span className="font-mono text-slate-500">ID: {activeMeeting.id}</span>
+                      <span aria-hidden="true">·</span>
                       <span
                         className={`font-medium ${
                           activeMeeting.aiSummary ? 'text-emerald-700' : 'text-amber-700'
@@ -451,6 +584,41 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
                   </div>
                 )}
 
+                {/* Ingestion Metadata & Validation Status Bar */}
+                {activeMeeting.ingestionMetadata && (
+                  <div className="mt-4 p-3 rounded-lg bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2 text-slate-700">
+                      <Database className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                      <span className="font-semibold">Ingestion Metadata:</span>
+                      <span className="font-mono uppercase text-indigo-700">
+                        {activeMeeting.ingestionMetadata.inputType}
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span className="font-mono text-slate-500">
+                        {activeMeeting.ingestionMetadata.ingestedAt.slice(0, 19).replace('T', ' ')}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <ShieldCheck
+                        className={`w-3.5 h-3.5 ${
+                          activeMeeting.ingestionMetadata.validationStatus === 'Valid'
+                            ? 'text-emerald-600'
+                            : 'text-amber-600'
+                        }`}
+                      />
+                      <span
+                        className={`font-semibold ${
+                          activeMeeting.ingestionMetadata.validationStatus === 'Valid'
+                            ? 'text-emerald-700'
+                            : 'text-amber-700'
+                        }`}
+                      >
+                        Validation: {activeMeeting.ingestionMetadata.validationStatus}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Participants Row */}
                 <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-4">
                   <span className="text-xs font-medium text-slate-500 inline-flex items-center gap-1.5">
@@ -476,16 +644,16 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
                 </div>
               </div>
 
-              {/* AI Summary & Key Discussion Points */}
+              {/* AI Summary, Key Discussion Points, Dependencies & Open Issues */}
               <div className="p-6 bg-indigo-50/40 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5 font-mono">
                     <Sparkles className="w-3.5 h-3.5 text-violet-600" />
-                    AI-Generated Summary &amp; Key Discussion Points
+                    AI-Generated Summary, Discussion Points &amp; Dependencies
                   </h3>
                   {activeMeeting.aiAnalyzedAt && (
                     <span className="text-[11px] font-mono text-emerald-700">
-                      Human-Verified Record
+                      Human-Verified Record · {activeMeeting.aiAnalyzedAt.slice(0, 10)}
                     </span>
                   )}
                 </div>
@@ -509,6 +677,20 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
                   </div>
                 )}
 
+                {activeMeeting.keyDiscussionPoints &&
+                  activeMeeting.keyDiscussionPoints.length > 0 && (
+                    <div className="bg-white p-4 rounded-lg border border-slate-200">
+                      <h4 className="text-xs font-semibold text-slate-700 mb-2">
+                        Key Discussion Points ({activeMeeting.keyDiscussionPoints.length})
+                      </h4>
+                      <ul className="space-y-1.5 text-xs text-slate-700 list-disc list-inside">
+                        {activeMeeting.keyDiscussionPoints.map((pt, idx) => (
+                          <li key={idx}>{pt}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-white p-4 rounded-lg border border-slate-200">
                     <h4 className="text-xs font-semibold text-slate-700">
@@ -520,20 +702,51 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
                   </div>
                   <div className="bg-white p-4 rounded-lg border border-slate-200">
                     <h4 className="text-xs font-semibold text-slate-700">
-                      Executive Notes &amp; Next Steps
+                      Executive Notes &amp; Follow-Up Requirements
                     </h4>
                     <p className="mt-2 text-xs text-slate-600 whitespace-pre-wrap leading-relaxed">
                       {activeMeeting.notes || 'No executive notes recorded.'}
                     </p>
-                    {activeMeeting.nextSteps && activeMeeting.nextSteps.length > 0 && (
+                    {(activeMeeting.followUpRequirements || activeMeeting.nextSteps || [])
+                      .length > 0 && (
                       <ul className="mt-2 pt-2 border-t border-slate-100 space-y-1 text-xs text-indigo-900 list-disc list-inside">
-                        {activeMeeting.nextSteps.map((step, i) => (
-                          <li key={i}>{step}</li>
-                        ))}
+                        {(activeMeeting.followUpRequirements || activeMeeting.nextSteps || []).map(
+                          (step, i) => (
+                            <li key={i}>{step}</li>
+                          )
+                        )}
                       </ul>
                     )}
                   </div>
                 </div>
+
+                {((activeMeeting.dependencies && activeMeeting.dependencies.length > 0) ||
+                  (activeMeeting.openIssues && activeMeeting.openIssues.length > 0)) && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-white p-4 rounded-lg border border-slate-200">
+                      <h4 className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                        <GitBranch className="w-3.5 h-3.5 text-indigo-600" />
+                        Extracted Dependencies ({activeMeeting.dependencies?.length || 0})
+                      </h4>
+                      <ul className="mt-2 space-y-1 text-xs text-slate-600 list-disc list-inside">
+                        {(activeMeeting.dependencies || []).map((dep, i) => (
+                          <li key={i}>{dep}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="bg-white p-4 rounded-lg border border-slate-200">
+                      <h4 className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                        Open Issues ({activeMeeting.openIssues?.length || 0})
+                      </h4>
+                      <ul className="mt-2 space-y-1 text-xs text-slate-600 list-disc list-inside">
+                        {(activeMeeting.openIssues || []).map((iss, i) => (
+                          <li key={i}>{iss}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Decisions Made & Active Blockers */}
@@ -619,6 +832,8 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
                                   ? 'text-emerald-700 font-semibold inline-flex items-center gap-1'
                                   : t.status === 'overdue'
                                   ? 'text-red-600 font-semibold inline-flex items-center gap-1'
+                                  : t.status === 'in-progress'
+                                  ? 'text-indigo-700 font-semibold inline-flex items-center gap-1'
                                   : 'text-amber-700 font-medium inline-flex items-center gap-1'
                               }
                             >
@@ -678,6 +893,145 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
           ) : null}
         </div>
       </div>
+
+      {/* Multi-Format Data Ingestion Modal (TXT, CSV, JSON) */}
+      {isIngestOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ingest-modal-title"
+          data-testid="ingest-meeting-modal"
+        >
+          <div className="bg-white border border-slate-200 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-xl">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+              <div>
+                <span className="text-[11px] font-mono uppercase tracking-wider text-indigo-600 font-semibold">
+                  Feature A · Automated Data Ingestion Pipeline
+                </span>
+                <h3 id="ingest-modal-title" className="text-base font-bold text-slate-900 mt-0.5">
+                  Ingest Meeting Data via TXT, CSV, or JSON
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsIngestOpen(false)}
+                aria-label="Close ingestion modal"
+                className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleIngestSubmit} className="mt-4 space-y-4">
+              {ingestError && (
+                <div
+                  className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700"
+                  data-testid="ingest-error-banner"
+                >
+                  {ingestError}
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div
+                  className="inline-flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200"
+                  role="group"
+                  aria-label="Select ingestion format"
+                >
+                  {(
+                    [
+                      { id: 'txt', label: 'TXT Transcript / Notes' },
+                      { id: 'csv', label: 'CSV Tabular Import' },
+                      { id: 'json', label: 'JSON Schema Payload' },
+                    ] as const
+                  ).map((fmt) => (
+                    <button
+                      key={fmt.id}
+                      type="button"
+                      onClick={() => handleFormatSwitch(fmt.id)}
+                      data-testid={`ingest-format-${fmt.id}`}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                        ingestFormat === fmt.id
+                          ? 'bg-white text-indigo-700 shadow-2xs font-semibold'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      {fmt.label}
+                    </button>
+                  ))}
+                </div>
+
+                <label className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg inline-flex items-center gap-1.5 cursor-pointer">
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Upload .txt / .csv / .json File</span>
+                  <input
+                    type="file"
+                    accept=".txt,.csv,.json"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label
+                    htmlFor="ingest-raw-textarea"
+                    className="text-xs font-semibold text-slate-700"
+                  >
+                    Raw {ingestFormat.toUpperCase()} Ingestion Payload
+                  </label>
+                  <span className="text-[11px] font-mono text-slate-500">
+                    Validates required fields, dates, participants &amp; duplicate submissions
+                  </span>
+                </div>
+                <textarea
+                  id="ingest-raw-textarea"
+                  rows={10}
+                  value={ingestContent}
+                  onChange={(e) => setIngestContent(e.target.value)}
+                  data-testid="ingest-raw-textarea"
+                  className="w-full p-3 text-xs font-mono bg-slate-900 text-slate-100 rounded-xl border border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600 leading-relaxed"
+                />
+              </div>
+
+              <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoExtractOnIngest}
+                  onChange={(e) => setAutoExtractOnIngest(e.target.checked)}
+                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                />
+                <span>
+                  Automatically run structured AI / deterministic extraction and link extracted
+                  decisions &amp; action items on ingestion
+                </span>
+              </label>
+
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsIngestOpen(false)}
+                  className="px-4 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={ingesting}
+                  data-testid="submit-ingest-btn"
+                  className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 cursor-pointer"
+                >
+                  {ingesting
+                    ? 'Validating & Ingesting...'
+                    : `Validate & Ingest ${ingestFormat.toUpperCase()}`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Create / Edit Meeting Modal */}
       {isFormOpen && (

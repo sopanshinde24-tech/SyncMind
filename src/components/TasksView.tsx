@@ -1,13 +1,16 @@
 import React, { useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowRight,
   CheckCircle2,
   Clock,
   Columns3,
   CornerDownRight,
   Edit3,
+  GripVertical,
   History,
   List,
+  PlayCircle,
   Plus,
   Search,
   Trash2,
@@ -32,9 +35,11 @@ interface TasksViewProps {
       Pick<ActionItem, 'title' | 'description' | 'owner' | 'priority' | 'deadline' | 'status'>
     >
   ) => Promise<void>;
-  onToggleTaskStatus: (taskId: string, nextStatus: 'pending' | 'completed') => Promise<void>;
+  onToggleTaskStatus: (taskId: string, nextStatus: TaskStatus) => Promise<void>;
   onDeleteTask: (taskId: string) => Promise<void>;
 }
+
+type KanbanColumnId = 'pending' | 'in-progress' | 'completed';
 
 export const TasksView: React.FC<TasksViewProps> = ({
   state,
@@ -49,6 +54,22 @@ export const TasksView: React.FC<TasksViewProps> = ({
   const [priorityFilter, setPriorityFilter] = useState<'all' | TaskPriority>('all');
   const [ownerFilter, setOwnerFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'deadline' | 'priority' | 'status'>('deadline');
+
+  // Drag-and-Drop Kanban State & PwC Consulting Column Task Limits (WIP Capacity)
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<KanbanColumnId | null>(null);
+  const [columnTaskLimits, setColumnTaskLimits] = useState<Record<KanbanColumnId, number>>({
+    pending: 4,
+    'in-progress': 3,
+    completed: 6,
+  });
+
+  const adjustColumnLimit = (colId: KanbanColumnId, delta: number) => {
+    setColumnTaskLimits((prev) => ({
+      ...prev,
+      [colId]: Math.max(1, Math.min(15, prev[colId] + delta)),
+    }));
+  };
 
   // Task Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -73,7 +94,12 @@ export const TasksView: React.FC<TasksViewProps> = ({
 
   const filteredTasks = useMemo(() => {
     const priorityRank: Record<TaskPriority, number> = { High: 1, Medium: 2, Low: 3 };
-    const statusRank: Record<TaskStatus, number> = { overdue: 1, pending: 2, completed: 3 };
+    const statusRank: Record<TaskStatus, number> = {
+      overdue: 1,
+      'in-progress': 2,
+      pending: 3,
+      completed: 4,
+    };
 
     return state.tasks
       .filter((t) => {
@@ -161,8 +187,29 @@ export const TasksView: React.FC<TasksViewProps> = ({
     }
   };
 
+  const handleKanbanDrop = async (targetColumn: KanbanColumnId, explicitTaskId?: string) => {
+    const taskId = explicitTaskId || draggedTaskId;
+    setDraggedTaskId(null);
+    setDragOverColumn(null);
+    if (!taskId) return;
+
+    const task = state.tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    const currentMappedColumn: KanbanColumnId =
+      task.status === 'completed'
+        ? 'completed'
+        : task.status === 'in-progress'
+        ? 'in-progress'
+        : 'pending';
+
+    if (currentMappedColumn === targetColumn) return;
+    await onToggleTaskStatus(taskId, targetColumn);
+  };
+
   const overdueCount = state.tasks.filter((t) => t.status === 'overdue').length;
   const pendingCount = state.tasks.filter((t) => t.status === 'pending').length;
+  const inProgressCount = state.tasks.filter((t) => t.status === 'in-progress').length;
   const completedCount = state.tasks.filter((t) => t.status === 'completed').length;
 
   // Keep drawer synced with updated state
@@ -179,10 +226,11 @@ export const TasksView: React.FC<TasksViewProps> = ({
             Action Item Management
           </span>
           <h2 className="text-lg font-bold text-slate-900 mt-0.5">
-            Action Item Ledger &amp; Kanban Workspace
+            Action Item Ledger &amp; Kanban Workflow Board
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Track ownership, priority, deadlines, source meeting lineage, and status audit trails
+            Track ownership, priority, deadlines, source meeting lineage, and drag-and-drop workflow
+            progression across Pending, In Progress, and Completed columns
           </p>
         </div>
 
@@ -272,6 +320,17 @@ export const TasksView: React.FC<TasksViewProps> = ({
             }`}
           >
             Pending ({pendingCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('in-progress')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              statusFilter === 'in-progress'
+                ? 'bg-white text-indigo-700 shadow-2xs font-semibold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            In Progress ({inProgressCount})
           </button>
           <button
             type="button"
@@ -390,6 +449,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
                 {filteredTasks.map((task) => {
                   const isCompleted = task.status === 'completed';
                   const isOverdue = task.status === 'overdue';
+                  const isInProgress = task.status === 'in-progress';
                   const isCarried = task.carriedFromMeetingIds.length > 0;
 
                   return (
@@ -426,6 +486,13 @@ export const TasksView: React.FC<TasksViewProps> = ({
                                 Overdue
                               </span>
                             </>
+                          ) : isInProgress ? (
+                            <>
+                              <PlayCircle className="w-4 h-4 text-indigo-600" />
+                              <span className="text-indigo-700 font-semibold group-hover:underline">
+                                In Progress
+                              </span>
+                            </>
                           ) : (
                             <>
                               <Clock className="w-4 h-4 text-amber-600" />
@@ -454,6 +521,14 @@ export const TasksView: React.FC<TasksViewProps> = ({
                               <span className="text-indigo-600 font-medium inline-flex items-center gap-1">
                                 <CornerDownRight className="w-3 h-3" />
                                 Carried to: {task.currentMeetingTitle}
+                              </span>
+                            </>
+                          )}
+                          {task.dependencies && task.dependencies.length > 0 && (
+                            <>
+                              <span aria-hidden="true">·</span>
+                              <span className="text-slate-600 font-mono text-[11px]">
+                                Dep: {task.dependencies[0]}
                               </span>
                             </>
                           )}
@@ -559,123 +634,334 @@ export const TasksView: React.FC<TasksViewProps> = ({
           </div>
         </div>
       ) : (
-        /* VIEW MODE 2: Enterprise Kanban Board */
-        <div
-          className="grid grid-cols-1 lg:grid-cols-3 gap-6"
-          data-testid="tasks-kanban-board"
-        >
-          {(
-            [
-              {
-                status: 'overdue' as TaskStatus,
-                label: 'Overdue & Escalated',
-                accent: 'border-t-4 border-t-red-600',
-                badge: 'text-red-700 bg-red-50',
-              },
-              {
-                status: 'pending' as TaskStatus,
-                label: 'In Progress / Scheduled',
-                accent: 'border-t-4 border-t-indigo-600',
-                badge: 'text-indigo-700 bg-indigo-50',
-              },
-              {
-                status: 'completed' as TaskStatus,
-                label: 'Completed & Verified',
-                accent: 'border-t-4 border-t-emerald-600',
-                badge: 'text-emerald-700 bg-emerald-50',
-              },
-            ] as const
-          ).map((col) => {
-            const colTasks = filteredTasks.filter((t) => t.status === col.status);
-            return (
-              <div
-                key={col.status}
-                className={`bg-white border border-slate-200 rounded-xl ${col.accent} p-4 space-y-3 shadow-2xs`}
-              >
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <span className="text-xs font-bold text-slate-900">{col.label}</span>
-                  <span
-                    className={`px-2 py-0.5 rounded text-xs font-mono font-semibold ${col.badge}`}
-                  >
-                    {colTasks.length}
-                  </span>
-                </div>
+        /* VIEW MODE 2: Enterprise Kanban Board (Pending, In Progress, Completed with Drag-and-Drop & PwC Task Limit Counters) */
+        <div className="space-y-4" data-testid="tasks-kanban-board">
+          {/* PwC Consulting Team Capacity & WIP Bottleneck Bar */}
+          <div className="bg-white border border-slate-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
+            <div className="flex items-center gap-2 text-slate-600">
+              <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-mono font-semibold text-[11px]">
+                PwC Consulting WIP Controls
+              </span>
+              <span>
+                Drag and drop cards across <strong>Pending</strong>, <strong>In Progress</strong>, and{' '}
+                <strong>Completed</strong> columns. Column <strong>Task Limits</strong> highlight
+                delivery capacity across Gurugram, Bengaluru &amp; Mumbai leads.
+              </span>
+            </div>
+            <div className="flex items-center gap-3 shrink-0 font-mono text-[11px]">
+              <span className="text-slate-500">
+                Active Delivery Leads: <strong className="text-slate-800">{state.participants.length}</strong>
+              </span>
+              <span className="text-slate-300">|</span>
+              <span className="text-slate-500">
+                Displayed Tasks: <strong className="text-slate-800">{filteredTasks.length}</strong>
+              </span>
+            </div>
+          </div>
 
-                <div className="space-y-3">
-                  {colTasks.map((task) => {
-                    const isCompleted = task.status === 'completed';
-                    return (
-                      <div
-                        key={task.id}
-                        className="p-3.5 rounded-xl bg-slate-50/70 border border-slate-200 hover:border-indigo-300 transition-all space-y-2.5"
-                      >
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span
-                            className={`font-semibold ${
-                              task.priority === 'High'
-                                ? 'text-red-600'
-                                : task.priority === 'Medium'
-                                ? 'text-indigo-700'
-                                : 'text-slate-500'
-                            }`}
-                          >
-                            {task.priority} Priority
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {(
+              [
+                {
+                  id: 'pending' as KanbanColumnId,
+                  label: 'Pending',
+                  roleContext: 'Backlog & Intake Queue (PwC Advisory / Legal)',
+                  subtitle: 'Queued & overdue action items awaiting active execution',
+                  accent: 'border-t-4 border-t-amber-500',
+                  badge: 'text-amber-800 bg-amber-50',
+                  barColor: 'bg-amber-500',
+                  filterFn: (t: ActionItem) => t.status === 'pending' || t.status === 'overdue',
+                },
+                {
+                  id: 'in-progress' as KanbanColumnId,
+                  label: 'In Progress',
+                  roleContext: 'Active Consulting Sprint WIP (Engineering & Governance)',
+                  subtitle: 'Active sprint deliverables currently in execution',
+                  accent: 'border-t-4 border-t-indigo-600',
+                  badge: 'text-indigo-700 bg-indigo-50',
+                  barColor: 'bg-indigo-600',
+                  filterFn: (t: ActionItem) => t.status === 'in-progress',
+                },
+                {
+                  id: 'completed' as KanbanColumnId,
+                  label: 'Completed',
+                  roleContext: 'Verified Client Deliverables (Sprint Target)',
+                  subtitle: 'Verified & closed deliverables with audit timestamp',
+                  accent: 'border-t-4 border-t-emerald-600',
+                  badge: 'text-emerald-700 bg-emerald-50',
+                  barColor: 'bg-emerald-600',
+                  filterFn: (t: ActionItem) => t.status === 'completed',
+                },
+              ] as const
+            ).map((col) => {
+              const colTasks = filteredTasks.filter(col.filterFn);
+              const isDropTarget = dragOverColumn === col.id;
+              const taskLimit = columnTaskLimits[col.id];
+              const isOverLimit = col.id !== 'completed' && colTasks.length > taskLimit;
+              const isAtLimit = col.id !== 'completed' && colTasks.length === taskLimit;
+              const utilizationPct = Math.min(100, Math.round((colTasks.length / Math.max(1, taskLimit)) * 100));
+
+              return (
+                <div
+                  key={col.id}
+                  data-testid={`kanban-col-${col.id}`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (dragOverColumn !== col.id) {
+                      setDragOverColumn(col.id);
+                    }
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverColumn === col.id) {
+                      setDragOverColumn(null);
+                    }
+                  }}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    const droppedId = e.dataTransfer.getData('text/plain') || draggedTaskId;
+                    if (droppedId) {
+                      await handleKanbanDrop(col.id, droppedId);
+                    }
+                  }}
+                  className={`bg-white border rounded-xl ${col.accent} p-4 space-y-3 shadow-2xs transition-colors min-h-[380px] flex flex-col ${
+                    isDropTarget
+                      ? 'border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/20'
+                      : isOverLimit
+                      ? 'border-red-300 bg-red-50/10'
+                      : 'border-slate-200'
+                  }`}
+                >
+                  {/* Column Header with Visual 'Task limit' Counter & Capacity Telemetry */}
+                  <div className="pb-3 border-b border-slate-100 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <span className="text-xs font-bold text-slate-900">{col.label}</span>
+                        <span className="block text-[10px] font-mono text-slate-400">
+                          {col.roleContext}
+                        </span>
+                      </div>
+
+                      {/* Visual 'Task limit' Counter Pill + Adjusters */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <div
+                          data-testid={`kanban-task-limit-${col.id}`}
+                          className={`px-2 py-0.5 rounded-md text-[11px] font-mono font-semibold tabular-nums border inline-flex items-center gap-1 ${
+                            isOverLimit
+                              ? 'bg-red-50 text-red-700 border-red-200'
+                              : isAtLimit
+                              ? 'bg-amber-50 text-amber-800 border-amber-200'
+                              : col.badge + ' border-transparent'
+                          }`}
+                          title="Column Task Limit (Work-In-Progress team capacity threshold)"
+                        >
+                          <span>Task Limit:</span>
+                          <span data-testid={`kanban-count-${col.id}`}>
+                            {colTasks.length}
                           </span>
-                          <span className="font-mono text-slate-500">Due {task.deadline}</span>
+                          <span>/</span>
+                          <span>{taskLimit}</span>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => setHistoryTask(task)}
-                          className="text-left text-xs font-semibold text-slate-900 hover:text-indigo-600 block cursor-pointer"
+                        <div
+                          className="inline-flex items-center border border-slate-200 rounded bg-slate-50"
+                          role="group"
+                          aria-label={`Adjust ${col.label} task limit`}
                         >
-                          {task.title}
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => adjustColumnLimit(col.id, -1)}
+                            title={`Decrease ${col.label} task limit`}
+                            data-testid={`decrease-limit-${col.id}`}
+                            className="px-1.5 py-0.5 text-[10px] font-mono text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 cursor-pointer"
+                          >
+                            -
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => adjustColumnLimit(col.id, 1)}
+                            title={`Increase ${col.label} task limit`}
+                            data-testid={`increase-limit-${col.id}`}
+                            className="px-1.5 py-0.5 text-[10px] font-mono text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 border-l border-slate-200 cursor-pointer"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
 
-                        <div className="flex items-center justify-between pt-2 border-t border-slate-200/70">
-                          <div className="flex items-center gap-1.5 text-xs">
-                            <ParticipantAvatar
-                              name={task.owner}
-                              participants={state.participants}
-                              size="sm"
-                            />
-                            <span className="text-slate-700 font-medium truncate max-w-[120px]">
-                              {task.owner}
+                    {/* Team Capacity Progress Bar */}
+                    <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-300 ${
+                          isOverLimit
+                            ? 'bg-red-600'
+                            : isAtLimit
+                            ? 'bg-amber-500'
+                            : col.barColor
+                        }`}
+                        style={{ width: `${utilizationPct}%` }}
+                      />
+                    </div>
+
+                    {/* Capacity / Bottleneck Status Subtitle */}
+                    <div className="flex items-center justify-between gap-2 text-[11px]">
+                      <span className="text-slate-400 truncate">{col.subtitle}</span>
+                      {isOverLimit ? (
+                        <span
+                          className="text-red-600 font-mono font-semibold shrink-0 inline-flex items-center gap-1"
+                          data-testid={`kanban-bottleneck-${col.id}`}
+                        >
+                          <AlertTriangle className="w-3 h-3" />
+                          Bottleneck (+{colTasks.length - taskLimit})
+                        </span>
+                      ) : isAtLimit ? (
+                        <span
+                          className="text-amber-700 font-mono font-semibold shrink-0"
+                          data-testid={`kanban-bottleneck-${col.id}`}
+                        >
+                          At Capacity (100%)
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 font-mono shrink-0">
+                          {Math.max(0, taskLimit - colTasks.length)} slot(s) open
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 flex-1">
+                    {colTasks.map((task) => {
+                      const isCompleted = task.status === 'completed';
+                      const isOverdue = task.status === 'overdue';
+                      const isDragging = draggedTaskId === task.id;
+
+                      return (
+                        <div
+                          key={task.id}
+                          draggable
+                          data-testid={`kanban-card-${task.id}`}
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('text/plain', task.id);
+                            e.dataTransfer.effectAllowed = 'move';
+                            setDraggedTaskId(task.id);
+                          }}
+                          onDragEnd={() => {
+                            setDraggedTaskId(null);
+                            setDragOverColumn(null);
+                          }}
+                          className={`p-3.5 rounded-xl bg-slate-50/80 border transition-all space-y-2.5 cursor-grab active:cursor-grabbing ${
+                            isDragging
+                              ? 'opacity-50 border-indigo-400 scale-[0.99]'
+                              : isOverdue
+                              ? 'border-red-200 bg-red-50/30 hover:border-red-300'
+                              : 'border-slate-200 hover:border-indigo-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between text-[11px]">
+                            <div className="flex items-center gap-1.5">
+                              <GripVertical className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span
+                                className={`font-semibold ${
+                                  task.priority === 'High'
+                                    ? 'text-red-600'
+                                    : task.priority === 'Medium'
+                                    ? 'text-indigo-700'
+                                    : 'text-slate-500'
+                                }`}
+                              >
+                                {task.priority} Priority
+                              </span>
+                              {isOverdue && (
+                                <span className="text-red-600 font-mono font-bold uppercase">
+                                  · OVERDUE
+                                </span>
+                              )}
+                            </div>
+                            <span
+                              className={`font-mono tabular-nums ${
+                                isOverdue ? 'text-red-600 font-semibold' : 'text-slate-500'
+                              }`}
+                            >
+                              Due {task.deadline}
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => setHistoryTask(task)}
-                              className="px-2 py-1 text-[11px] font-medium text-slate-600 hover:text-indigo-600 bg-white border border-slate-200 rounded cursor-pointer"
-                            >
-                              Details
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                onToggleTaskStatus(task.id, isCompleted ? 'pending' : 'completed')
-                              }
-                              className="px-2 py-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded cursor-pointer"
-                            >
-                              {isCompleted ? 'Reopen' : 'Done'}
-                            </button>
+                          <button
+                            type="button"
+                            onClick={() => setHistoryTask(task)}
+                            className="text-left text-xs font-semibold text-slate-900 hover:text-indigo-600 block cursor-pointer"
+                          >
+                            {task.title}
+                          </button>
+
+                          <div className="text-[11px] text-slate-500 truncate">
+                            Origin: {task.sourceMeetingTitle.split('—')[0].trim()}
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-200/70 gap-2">
+                            <div className="flex items-center gap-1.5 text-xs min-w-0">
+                              <ParticipantAvatar
+                                name={task.owner}
+                                participants={state.participants}
+                                size="sm"
+                              />
+                              <span className="text-slate-700 font-medium truncate">
+                                {task.owner}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              {col.id !== 'pending' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleKanbanDrop('pending', task.id)}
+                                  title="Move to Pending"
+                                  data-testid={`move-to-pending-${task.id}`}
+                                  className="px-2 py-1 text-[11px] font-medium text-slate-600 hover:text-amber-700 bg-white border border-slate-200 rounded cursor-pointer"
+                                >
+                                  Pending
+                                </button>
+                              )}
+                              {col.id !== 'in-progress' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleKanbanDrop('in-progress', task.id)}
+                                  title="Move to In Progress"
+                                  data-testid={`move-to-in-progress-${task.id}`}
+                                  className="px-2 py-1 text-[11px] font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded inline-flex items-center gap-0.5 cursor-pointer"
+                                >
+                                  Start
+                                  <ArrowRight className="w-3 h-3" />
+                                </button>
+                              )}
+                              {!isCompleted && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleKanbanDrop('completed', task.id)}
+                                  title="Move to Completed"
+                                  data-testid={`move-to-completed-${task.id}`}
+                                  className="px-2 py-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded cursor-pointer"
+                                >
+                                  Done
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
 
-                  {colTasks.length === 0 && (
-                    <div className="py-8 text-center text-xs text-slate-400">
-                      No tasks in {col.label}
-                    </div>
-                  )}
+                    {colTasks.length === 0 && (
+                      <div className="py-10 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl">
+                        Drop tasks here to mark <strong>{col.label}</strong>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -955,20 +1241,32 @@ export const TasksView: React.FC<TasksViewProps> = ({
               >
                 Edit Fields
               </button>
-              <button
-                type="button"
-                onClick={() =>
-                  onToggleTaskStatus(
-                    activeDrawerTask.id,
-                    activeDrawerTask.status === 'completed' ? 'pending' : 'completed'
-                  )
-                }
-                className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg cursor-pointer"
-              >
-                {activeDrawerTask.status === 'completed'
-                  ? 'Reopen Action Item'
-                  : 'Mark as Completed'}
-              </button>
+              <div className="flex items-center gap-2">
+                {activeDrawerTask.status !== 'in-progress' &&
+                  activeDrawerTask.status !== 'completed' && (
+                    <button
+                      type="button"
+                      onClick={() => onToggleTaskStatus(activeDrawerTask.id, 'in-progress')}
+                      className="px-3.5 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg cursor-pointer"
+                    >
+                      Move to In Progress
+                    </button>
+                  )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    onToggleTaskStatus(
+                      activeDrawerTask.id,
+                      activeDrawerTask.status === 'completed' ? 'pending' : 'completed'
+                    )
+                  }
+                  className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg cursor-pointer"
+                >
+                  {activeDrawerTask.status === 'completed'
+                    ? 'Reopen Action Item'
+                    : 'Mark as Completed'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

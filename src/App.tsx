@@ -7,6 +7,7 @@ import {
   Calendar,
   CheckSquare,
   CornerDownRight,
+  Database,
   LayoutDashboard,
   Menu,
   Search,
@@ -28,6 +29,7 @@ import {
   apiDeleteMeeting,
   apiDeleteTask,
   apiGenerateExecutiveReport,
+  apiIngestMeetingData,
   apiResetDemoData,
   apiSendCopilotMessage,
   apiUpdateMeeting,
@@ -44,6 +46,7 @@ import { GuidedDemoController } from './components/GuidedDemoController';
 import { HandoverView } from './components/HandoverView';
 import { MeetingsView } from './components/MeetingsView';
 import { ProblemSolutionVideo } from './components/ProblemSolutionVideo';
+import { ProcessingHistoryView } from './components/ProcessingHistoryView';
 import { ReportsView } from './components/ReportsView';
 import { SettingsView } from './components/SettingsView';
 import { TasksView } from './components/TasksView';
@@ -55,6 +58,7 @@ type ActiveTab =
   | 'tasks'
   | 'carry-forward'
   | 'handover'
+  | 'processing-history'
   | 'reports'
   | 'settings';
 
@@ -384,6 +388,12 @@ export default function App() {
       label: 'Carry-Forward',
       icon: CornerDownRight,
       count: metrics.openTasks,
+    },
+    {
+      id: 'processing-history',
+      label: 'Processing & Quality',
+      icon: Database,
+      count: (appState.processingHistory || []).length,
     },
     { id: 'reports', label: 'Reports & Analytics', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
@@ -840,10 +850,30 @@ export default function App() {
               selectedMeetingId={selectedMeetingId}
               onSelectMeeting={(id) => setSelectedMeetingId(id)}
               onCreateMeeting={async (payload) => {
-                const updated = await apiCreateMeeting(payload);
-                setAppState(updated);
-                setSelectedMeetingId(updated.meetings[0]?.id || null);
-                showToast(`Created meeting "${payload.title}".`);
+                try {
+                  const updated = await apiCreateMeeting(payload);
+                  setAppState(updated);
+                  setSelectedMeetingId(updated.meetings[0]?.id || null);
+                  showToast(`Created meeting "${payload.title}".`);
+                } catch (err) {
+                  const latest = await fetchAppState();
+                  setAppState(latest);
+                  throw err;
+                }
+              }}
+              onIngestMeeting={async (payload) => {
+                try {
+                  const updated = await apiIngestMeetingData(payload);
+                  setAppState(updated);
+                  setSelectedMeetingId(updated.meetings[0]?.id || null);
+                  showToast(
+                    `Ingested ${payload.format.toUpperCase()} meeting "${updated.meetings[0]?.title}".`
+                  );
+                } catch (err) {
+                  const latest = await fetchAppState();
+                  setAppState(latest);
+                  throw err;
+                }
               }}
               onUpdateMeeting={async (id, updates) => {
                 const updated = await apiUpdateMeeting(id, updates);
@@ -934,6 +964,14 @@ export default function App() {
                 setAppState(updated);
                 showToast('Task carried forward with source lineage preserved.');
               }}
+            />
+          )}
+
+          {activeTab === 'processing-history' && (
+            <ProcessingHistoryView
+              state={appState}
+              onSelectMeeting={(id) => setSelectedMeetingId(id)}
+              onNavigateTab={(tab) => setActiveTab(tab as ActiveTab)}
             />
           )}
 

@@ -7,6 +7,7 @@ import { createServer as createViteServer } from 'vite';
 import {
   acknowledgeHandover,
   approveAIAnalysisToMeeting,
+  calculateDashboardMetrics,
   calculateWeeklyReport,
   carryForwardTask,
   createHandover,
@@ -14,8 +15,11 @@ import {
   createTask,
   deleteMeeting,
   deleteTask,
+  evaluateWorkspaceDataQuality,
   executeCopilotTurn,
   extractMeetingDeterministic,
+  ingestMeetingData,
+  recordProcessingLog,
   resetToDemoState,
   updateMeeting,
   updateTask,
@@ -23,7 +27,7 @@ import {
   validateAIAnalysisOutput,
 } from './src/core/engine';
 import { createInitialSeedState } from './src/core/seedData';
-import { AppDatabaseState } from './src/core/types';
+import { AppDatabaseState, TaskStatus } from './src/core/types';
 
 dotenv.config();
 
@@ -48,6 +52,9 @@ function ensureDbLoaded(): AppDatabaseState {
         Array.isArray(parsed.tasks) &&
         parsed.scenarioName?.includes('PwC India')
       ) {
+        if (!Array.isArray(parsed.processingHistory)) {
+          parsed.processingHistory = createInitialSeedState().processingHistory;
+        }
         return parsed;
       }
     }
@@ -118,14 +125,63 @@ export function createApiApp() {
     res.json(dbState);
   });
 
-  // 3. Meetings CRUD
+  // 3. Meetings CRUD & Multi-Format Data Ingestion (TXT, CSV, JSON)
   app.post('/api/meetings', (req, res) => {
     try {
       dbState = createMeeting(dbState, req.body);
       saveDbState(dbState);
       res.status(201).json(dbState);
     } catch (err: unknown) {
-      res.status(400).json({ error: err instanceof Error ? err.message : 'Invalid meeting input' });
+      const errorMsg = err instanceof Error ? err.message : 'Invalid meeting input';
+      dbState = recordProcessingLog(dbState, {
+        meetingId: 'failed-ingestion',
+        meetingTitle: req.body?.title || 'Rejected Meeting Submission',
+        inputType: req.body?.inputType || 'manual',
+        extractionStatus: 'Failed',
+        sourceEngine: 'ingestion-validator',
+        decisionsExtracted: 0,
+        actionItemsExtracted: 0,
+        validationStatus: 'Failed',
+        errors: [errorMsg],
+        warnings: [],
+      });
+      saveDbState(dbState);
+      res.status(400).json({ error: errorMsg, state: dbState });
+    }
+  });
+
+  app.post('/api/meetings/ingest', (req, res) => {
+    const { format, rawContent, autoExtract } = (req.body || {}) as {
+      format?: 'txt' | 'csv' | 'json';
+      rawContent?: string;
+      autoExtract?: boolean;
+    };
+    const safeFormat = format === 'csv' || format === 'json' ? format : 'txt';
+
+    try {
+      dbState = ingestMeetingData(dbState, {
+        format: safeFormat,
+        rawContent: rawContent || '',
+        autoExtract: Boolean(autoExtract),
+      });
+      saveDbState(dbState);
+      res.status(201).json(dbState);
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to ingest meeting data';
+      dbState = recordProcessingLog(dbState, {
+        meetingId: `failed-${safeFormat}-${Date.now()}`,
+        meetingTitle: `Failed ${safeFormat.toUpperCase()} Ingestion`,
+        inputType: safeFormat,
+        extractionStatus: 'Failed',
+        sourceEngine: 'ingestion-validator',
+        decisionsExtracted: 0,
+        actionItemsExtracted: 0,
+        validationStatus: 'Failed',
+        errors: [errorMsg],
+        warnings: [],
+      });
+      saveDbState(dbState);
+      res.status(400).json({ error: errorMsg, state: dbState });
     }
   });
 
@@ -135,7 +191,9 @@ export function createApiApp() {
       saveDbState(dbState);
       res.json(dbState);
     } catch (err: unknown) {
-      res.status(400).json({ error: err instanceof Error ? err.message : 'Failed to update meeting' });
+      res
+        .status(400)
+        .json({ error: err instanceof Error ? err.message : 'Failed to update meeting' });
     }
   });
 
@@ -145,11 +203,65 @@ export function createApiApp() {
       saveDbState(dbState);
       res.json(dbState);
     } catch (err: unknown) {
-      res.status(400).json({ error: err instanceof Error ? err.message : 'Failed to delete meeting' });
+      res
+        .status(400)
+        .json({ error: err instanceof Error ? err.message : 'Failed to delete meeting' });
     }
   });
 
-  // 4. AI Meeting Assistant — Structured Extraction via Gemini
+  // 4. Dedicated Retrieval Endpoints (Summaries, Decisions, Action Items, Analytics, Processing History)
+  app.get('/api/summaries', (_req, res) => {
+    const summaries = dbState.meetings.map((m) => ({
+      meetingId: m.id,
+      title: m.title,
+      date: m.date,
+      participants: m.participants,
+      aiSummary: m.aiSummary || null,
+      keyDiscussionPoints: m.keyDiscussionPoints || [],
+      dependencies: m.dependencies || [],
+      openIssues: m.openIssues || [],
+      followUpRequirements: m.followUpRequirements || [],
+      nextSteps: m.nextSteps || [],
+      aiAnalyzedAt: m.aiAnalyzedAt || null,
+    }));
+    res.json({ count: summaries.length, summaries });
+  });
+
+  app.get('/api/decisions', (_req, res) => {
+    res.json({ count: dbState.decisions.length, decisions: dbState.decisions });
+  });
+
+  app.get('/api/action-items', (_req, res) => {
+    res.json({ count: dbState.tasks.length, actionItems: dbState.tasks });
+  });
+
+  app.get('/api/analytics', (_req, res) => {
+    const metrics = calculateDashboardMetrics(dbState);
+    const weeklyReport = calculateWeeklyReport(dbState);
+    const dataQuality = evaluateWorkspaceDataQuality(dbState);
+    res.json({
+      metrics,
+      byOwner: weeklyReport.byOwner,
+      weeklyTrend: weeklyReport.weeklyTrend,
+      dataQuality,
+    });
+  });
+
+  app.get('/api/processing-history', (_req, res) => {
+    const history = dbState.processingHistory || [];
+    const dataQuality = evaluateWorkspaceDataQuality(dbState);
+    res.json({
+      count: history.length,
+      processingHistory: history,
+      dataQuality,
+    });
+  });
+
+  app.get('/api/data-quality', (_req, res) => {
+    res.json(evaluateWorkspaceDataQuality(dbState));
+  });
+
+  // 5. AI Meeting Assistant — Structured Extraction via Gemini
   app.post('/api/ai/analyze-meeting', async (req, res) => {
     const { transcript, notes, title, fastMode } = req.body as {
       transcript?: string;
@@ -161,7 +273,8 @@ export function createApiApp() {
     const sourceText = `${transcript || ''}\n${notes || ''}`.trim();
     if (sourceText.length < 10) {
       res.status(400).json({
-        error: 'Please provide a meeting transcript or notes (at least 10 characters) to analyze.',
+        error:
+          'Please provide a meeting transcript or notes (at least 10 characters) to analyze.',
       });
       return;
     }
@@ -175,7 +288,7 @@ export function createApiApp() {
             contents: `Analyze the following meeting record${title ? ` titled "${title}"` : ''}.\n\nTRANSCRIPT:\n${transcript || '(None)'}\n\nNOTES:\n${notes || '(None)'}`,
             config: {
               systemInstruction: `You are SyncMind AI, an enterprise meeting intelligence extractor.
-Extract a structured executive summary, formal decisions, action items, operational blockers, and recommended next steps strictly from the provided transcript and notes.
+Extract a structured executive summary, key discussion points, formal decisions, action items, dependencies, open issues, operational blockers, and follow-up requirements strictly from the provided transcript and notes.
 CRITICAL RULES:
 1. Do NOT invent owners, dates, or decisions absent from the source text.
 2. If an action item has no explicit owner in the text, set owner to "Unassigned".
@@ -188,7 +301,12 @@ CRITICAL RULES:
                 properties: {
                   summary: {
                     type: Type.STRING,
-                    description: 'Concise 2-4 sentence executive summary of the meeting discussion.',
+                    description:
+                      'Concise 2-4 sentence executive summary of the meeting discussion.',
+                  },
+                  keyDiscussionPoints: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
                   },
                   decisions: {
                     type: Type.ARRAY,
@@ -220,6 +338,10 @@ CRITICAL RULES:
                           type: Type.STRING,
                           description: 'YYYY-MM-DD date or "Unspecified"',
                         },
+                        dependencies: {
+                          type: Type.ARRAY,
+                          items: { type: Type.STRING },
+                        },
                       },
                     },
                   },
@@ -233,6 +355,18 @@ CRITICAL RULES:
                         severity: { type: Type.STRING },
                       },
                     },
+                  },
+                  dependencies: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                  },
+                  openIssues: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                  },
+                  followUpRequirements: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
                   },
                   nextSteps: {
                     type: Type.ARRAY,
@@ -262,7 +396,7 @@ CRITICAL RULES:
     res.json(fallbackResult);
   });
 
-  // 5. Approve and save human-reviewed AI analysis to a meeting
+  // 6. Approve and save human-reviewed AI analysis to a meeting
   app.post('/api/meetings/:id/approve-analysis', (req, res) => {
     try {
       dbState = approveAIAnalysisToMeeting(dbState, req.params.id, req.body);
@@ -275,7 +409,7 @@ CRITICAL RULES:
     }
   });
 
-  // 6. Action Items CRUD & Status
+  // 7. Action Items CRUD & Status
   app.post('/api/tasks', (req, res) => {
     try {
       dbState = createTask(dbState, req.body);
@@ -298,12 +432,17 @@ CRITICAL RULES:
 
   app.patch('/api/tasks/:id/status', (req, res) => {
     try {
-      const { status, note } = req.body as { status: 'pending' | 'completed' | 'overdue'; note?: string };
+      const { status, note } = req.body as {
+        status: TaskStatus;
+        note?: string;
+      };
       dbState = updateTaskStatus(dbState, req.params.id, status, note);
       saveDbState(dbState);
       res.json(dbState);
     } catch (err: unknown) {
-      res.status(400).json({ error: err instanceof Error ? err.message : 'Failed to update task status' });
+      res
+        .status(400)
+        .json({ error: err instanceof Error ? err.message : 'Failed to update task status' });
     }
   });
 
@@ -317,7 +456,7 @@ CRITICAL RULES:
     }
   });
 
-  // 7. Carry-Forward System
+  // 8. Carry-Forward System
   app.post('/api/tasks/:id/carry-forward', (req, res) => {
     try {
       const { targetMeetingId, reason } = req.body as { targetMeetingId: string; reason?: string };
@@ -325,18 +464,22 @@ CRITICAL RULES:
       saveDbState(dbState);
       res.json(dbState);
     } catch (err: unknown) {
-      res.status(400).json({ error: err instanceof Error ? err.message : 'Carry-forward failed' });
+      res
+        .status(400)
+        .json({ error: err instanceof Error ? err.message : 'Carry-forward failed' });
     }
   });
 
-  // 8. Work Handovers
+  // 9. Work Handovers
   app.post('/api/handovers', (req, res) => {
     try {
       dbState = createHandover(dbState, req.body);
       saveDbState(dbState);
       res.status(201).json(dbState);
     } catch (err: unknown) {
-      res.status(400).json({ error: err instanceof Error ? err.message : 'Invalid handover data' });
+      res
+        .status(400)
+        .json({ error: err instanceof Error ? err.message : 'Invalid handover data' });
     }
   });
 
@@ -347,11 +490,13 @@ CRITICAL RULES:
       saveDbState(dbState);
       res.json(dbState);
     } catch (err: unknown) {
-      res.status(400).json({ error: err instanceof Error ? err.message : 'Failed to acknowledge handover' });
+      res
+        .status(400)
+        .json({ error: err instanceof Error ? err.message : 'Failed to acknowledge handover' });
     }
   });
 
-  // 9. AI Weekly Executive Report Generator
+  // 10. AI Weekly Executive Report Generator
   app.post('/api/ai/generate-report', async (req, res) => {
     const { fastMode } = (req.body || {}) as { fastMode?: boolean };
     const reportData = calculateWeeklyReport(dbState);
@@ -409,7 +554,7 @@ CRITICAL RULES:
     const overdueNames = reportData.overdueItems
       .map((i) => `"${i.title}" (${i.owner}, due ${i.deadline})`)
       .join('; ');
-    const fallbackNarrative = `Executive Operations Summary (${dbState.scenarioName}): Across ${m.totalMeetings} active meetings, SyncMind AI is tracking ${m.totalTasks} total action items with a ${m.completionRate}% overall completion rate (${m.completedTasks} completed, ${m.pendingTasks} pending, and ${m.overdueTasks} overdue). Leadership has locked in ${m.totalDecisions} formal operational decisions and executed ${m.carriedForwardCount} meeting-to-meeting task carry-forward(s) to preserve original source accountability.\n\nRisk & Follow-Up Priorities: ${
+    const fallbackNarrative = `Executive Operations Summary (${dbState.scenarioName}): Across ${m.totalMeetings} active meetings, SyncMind AI is tracking ${m.totalTasks} total action items with a ${m.completionRate}% overall completion rate (${m.completedTasks} completed, ${m.pendingTasks} pending/in-progress, and ${m.overdueTasks} overdue). Leadership has locked in ${m.totalDecisions} formal operational decisions and executed ${m.carriedForwardCount} meeting-to-meeting task carry-forward(s) to preserve original source accountability.\n\nRisk & Follow-Up Priorities: ${
       m.overdueTasks > 0
         ? `Immediate attention is required on ${m.overdueTasks} overdue deliverable(s): ${overdueNames}. `
         : 'All scheduled deliverables are currently on track with zero overdue items. '
@@ -427,10 +572,14 @@ CRITICAL RULES:
       lastUpdated: new Date().toISOString(),
     };
     saveDbState(dbState);
-    res.json({ narrative: fallbackNarrative, sourceEngine: 'deterministic-fallback', state: dbState });
+    res.json({
+      narrative: fallbackNarrative,
+      sourceEngine: 'deterministic-fallback',
+      state: dbState,
+    });
   });
 
-  // 10. Humanized AI Voiceover TTS (Gemini 3.8 Flash Lite TTS with natural speechMetadata)
+  // 11. Humanized AI Voiceover TTS (Gemini 3.8 Flash Lite TTS with natural speechMetadata)
   app.post('/api/ai/tts', async (req, res) => {
     const { text, voiceName } = (req.body || {}) as {
       text?: string;
@@ -509,7 +658,7 @@ CRITICAL RULES:
     });
   });
 
-  // 11. Interactive Business AI Copilot Chatbot (Queries & Updates Live Meetings/Tasks)
+  // 12. Interactive Business AI Copilot Chatbot (Queries & Updates Live Meetings/Tasks)
   app.post('/api/ai/chat', async (req, res) => {
     const { message } = (req.body || {}) as {
       message?: string;
@@ -535,7 +684,9 @@ CRITICAL RULES:
       try {
         const workspaceSnapshot = {
           scenarioName: dbState.scenarioName,
-          participants: dbState.participants.map((p) => `${p.name} (${p.role}, ${p.department})`),
+          participants: dbState.participants.map(
+            (p) => `${p.name} (${p.role}, ${p.department})`
+          ),
           meetings: dbState.meetings.map((m) => ({
             id: m.id,
             title: m.title,
@@ -552,7 +703,9 @@ CRITICAL RULES:
             sourceMeeting: t.sourceMeetingTitle,
           })),
           decisions: dbState.decisions.map((d) => `${d.summary} (${d.owner})`),
-          blockers: dbState.blockers.map((b) => `[${b.severity}] ${b.description} (${b.owner})`),
+          blockers: dbState.blockers.map(
+            (b) => `[${b.severity}] ${b.description} (${b.owner})`
+          ),
           handovers: dbState.handovers.map(
             (h) => `${h.title} (${h.fromPerson} -> ${h.toPerson}, Status: ${h.status})`
           ),
@@ -600,7 +753,10 @@ async function startServer() {
   const app = createApiApp();
 
   // Mount Vite in development or static dist in production
-  if (process.env.NODE_ENV === 'production' && fs.existsSync(path.resolve(process.cwd(), 'dist'))) {
+  if (
+    process.env.NODE_ENV === 'production' &&
+    fs.existsSync(path.resolve(process.cwd(), 'dist'))
+  ) {
     app.use(express.static(path.resolve(process.cwd(), 'dist')));
     app.get('*', (_req, res) => {
       res.sendFile(path.resolve(process.cwd(), 'dist', 'index.html'));
@@ -622,4 +778,3 @@ async function startServer() {
 if (!process.env.VERCEL) {
   startServer();
 }
-

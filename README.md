@@ -1,85 +1,183 @@
-# SyncMind AI — Meeting & Workflow Intelligence Platform
+# SyncMind AI — Enterprise Meeting Data Processing & Workflow Intelligence Platform
 
-SyncMind AI converts meeting discussions and transcripts into structured executive summaries, formal decisions, assigned action items, cross-meeting carry-forward workflows, and knowledge handovers. It prevents action items from getting forgotten between meetings while preserving original source lineage and human-in-the-loop verification.
+**Live Deployment:** [https://sync-mind-wine.vercel.app/](https://sync-mind-wine.vercel.app/)
 
----
+## Business Problem & Solution (PwC Data Engineering Associate Context)
 
-## 1. Key Capabilities & Functional Modules
-
-1. **Dashboard**: Real-time KPI summary (Total Meetings, Open Action Items, Completed Tasks, Overdue Tasks & Blockers), Weekly Execution & Completion Velocity bar chart, Ownership & Accountability breakdown, Recent Decisions, Active Blockers, and Priority Action Items.
-2. **Meeting Management**: Full CRUD for meeting records including title, date, start time, duration, participant roster, agenda, executive notes, verbatim transcript, and linked/carried-forward tasks.
-3. **AI Meeting Assistant (with Human-in-the-Loop Approval)**: Server-side Gemini structured JSON extraction (`/api/ai/analyze-meeting`) that generates an executive summary, decisions, action items, owners, deadlines, blockers, and next steps from transcripts or notes. Strictly avoids inventing owners or dates absent from the source text—marking missing fields as `Unassigned` or `Unspecified` for human review before saving.
-4. **Action Item Management**: Create, assign, edit, complete, reopen, and delete tasks with live search, status filter tabs (`All`, `Overdue`, `Pending`, `Completed`), priority and owner filters, sorting, and an immutable Status History modal.
-5. **Carry-Forward Accountability Engine**: Identifies unfinished (`pending` and `overdue`) tasks from earlier meetings and carries them into subsequent meetings while preserving `sourceMeetingId` / `sourceMeetingTitle`, appending to `statusHistory`, and preventing duplicate carry-forward records.
-6. **Work Handover**: Structured knowledge transfer packages containing project context, completed work, pending tasks, active blockers, key decisions, and next steps, with recipient acknowledgment sign-off.
-7. **Weekly Reports & AI Narrative**: Live calculation of task completion rates, owner workload distribution, overdue items, and carried-forward records, paired with an AI-synthesized executive narrative (`/api/ai/generate-report`) and one-click Markdown (`.md`) and JSON (`.json`) export.
+- **Business Problem:** In multi-city consulting and enterprise delivery environments (Gurugram, Bengaluru, Mumbai), critical meeting information is stored in unstructured notes and verbatim transcripts. Decisions, action items, task ownership, dependencies, and follow-ups become fragmented, making operational commitments difficult to organize, validate, retrieve, and track across sessions.
+- **How SyncMind AI Solves It:** SyncMind AI provides a 6-stage data engineering pipeline (`Meeting Transcript → AI Extraction → Structured Validation → Database Storage → Task Integration → Analytics`). It ingests unstructured transcripts and multi-format records (`TXT`, `CSV`, `JSON`), extracts schema-validated decisions, action items, dependencies, and follow-up requirements using **Google Gemini (`gemini-3-flash-preview`)** with a deterministic source-grounded fallback parser, validates records before saving (`Unassigned` owner / `Unspecified` ISO date checks & duplicate prevention), stores relational entities with zero orphaned references, and connects decisions to a **3-Column Kanban Workflow Board (`Pending`, `In Progress`, `Completed`)** equipped with visual **Column Task Limit (WIP Capacity) Counters** to detect consulting team bottlenecks.
 
 ---
 
-## 2. Automatic Recruiter Demo (`Scenario: Q4 Business Operations Review`)
+## 1. System Architecture Diagram
 
-On first launch, SyncMind AI automatically loads the fictional scenario **Scenario: Q4 Business Operations Review**:
-- **3 Participants**: Elena Rostova (VP of Operations), Marcus Vance (Principal Infrastructure Lead), and Priya Nair (Director of Customer Success).
-- **2 Meetings**:
-  - *Q4 Business Operations Review — Part 1: Infrastructure & SLA Alignment* (`2026-10-28`)
-  - *Q4 Business Operations Review — Part 2: Enterprise Rollout & Handover Sync* (`2026-11-02`)
-- **5 Action Items**: `1` Completed, `2` Pending, and `2` Overdue across different owners, priorities, and deadlines.
-- **2 Decisions & 1 Active Blocker**.
-- **1 Knowledge Handover Record**.
+```mermaid
+graph TB
+  subgraph Client["React 19 + TypeScript Enterprise SPA"]
+    UI_Dash["Operational Overview & Analytics"]
+    UI_Ingest["Meeting Data Ingestion (Manual / TXT / CSV / JSON)"]
+    UI_AI["AI Transcript Extraction & Human Review"]
+    UI_Tasks["Action Item Ledger & Kanban Board with Task Limit WIP Counters"]
+    UI_CF["Carry-Forward & Work Transfers"]
+    UI_DQ["Processing History, Data Quality & PwC JD Matrix"]
+    UI_Copilot["Interactive Business AI Copilot"]
+  end
 
-### Running the Guided Demo
-Click **Start Guided Demo** in the top dark banner to automatically execute the 9-step sequence using real application functions and live database updates:
-1. Open the sample meeting (*Part 2: Enterprise Rollout & Handover Sync*).
-2. Display its transcript and business context.
-3. Run the AI meeting analysis.
-4. Display the generated summary, decisions, blockers, and action items.
-5. Present the human review and approval step.
-6. Save the approved action items into persistent storage.
-7. Complete one pending task (*Publish onboarding runbook for EMEA enterprise support escalation*).
-8. Carry an unfinished overdue task (*Migrate legacy Stripe webhook queue to dead-letter retry worker*) from Part 1 into Part 2 while preserving original source lineage.
-9. Open the Weekly Report and display the updated figures.
+  subgraph Server["Express + TypeScript Backend (server.ts)"]
+    API_Ingest["POST /api/meetings & /api/meetings/ingest"]
+    API_AI["POST /api/ai/analyze-meeting & /api/meetings/:id/approve-analysis"]
+    API_Data["GET /api/summaries, /api/decisions, /api/action-items"]
+    API_Tasks["POST/PUT/PATCH /api/tasks & /api/tasks/:id/carry-forward"]
+    API_Analytics["GET /api/analytics, /api/processing-history, /api/data-quality"]
+  end
 
-You can also click **Complete All 9 Steps**, **Next Step**, **Reset Demo Data**, or **Explore Manually** at any time.
+  subgraph Engine["Core Data & Validation Engine (src/core/engine.ts)"]
+    Validator["Schema, ISO Date, Owner & Duplicate Validator"]
+    Extractor["Gemini 3.8 Flash + Source-Grounded Deterministic Extractor"]
+    DQEngine["Relational Integrity & Data Quality Auditor"]
+  end
 
----
+  subgraph Storage["Structured Persistence Layer"]
+    JSON_DB[("data/syncmind-db.json + Client LocalStorage Mirror")]
+  end
 
-## 3. Architecture & Persistence
-
-- **Frontend**: React 19 + TypeScript + Tailwind CSS v4 + Lucide Icons.
-- **Backend**: Express (`server.ts`) serving `/api/*` REST endpoints and mounting Vite middleware on port `3000`.
-- **AI Integration**: Server-side `@google/genai` SDK (`gemini-3.8-flash`) with `responseMimeType: "application/json"` and strict `responseSchema`. The API key (`process.env.GEMINI_API_KEY`) is accessed exclusively on the server and never exposed to the client. When `GEMINI_API_KEY` is not configured in a local evaluation environment, the server automatically falls back to `extractMeetingDeterministic`—a deterministic source-grounded transcript parser in `src/core/engine.ts` that extracts speakers, decisions, tasks, deadlines, and blockers directly from the transcript without inventing data.
-- **Persistence**: The Express server persists all state changes to disk at `data/syncmind-db.json` (and mirrors state in browser `localStorage` as a secondary client resilience layer), ensuring all changes survive page refreshes and server restarts.
-
----
-
-## 4. Installation, Startup & Testing
-
-### Prerequisites
-- Node.js 20+
-
-### Environment Variables (`.env`)
-Copy `.env.example` to `.env` and optionally provide your Gemini API key:
-```bash
-GEMINI_API_KEY="your_gemini_api_key_here"
+  Client --> Server
+  Server --> Engine
+  Engine --> Storage
 ```
 
-### One-Command Startup
+---
+
+## 2. Meeting Data-Flow Pipeline
+
+```mermaid
+LR
+  A["Raw Input (Manual / TXT / CSV / JSON)"] --> B["Ingestion & Duplicate Validator"]
+  B --> C["Meeting & Verbatim Transcript Store"]
+  C --> D["Gemini / Deterministic Schema Extractor"]
+  D --> E["Pre-Save AI Output Validator (Unassigned / Unspecified Flags)"]
+  E --> F["Human-in-the-Loop Review & Approval"]
+  F --> G["Structured Entities: Summary, Decisions, Action Items, Dependencies, Blockers"]
+  G --> H["Kanban Execution (Pending → In Progress → Completed) & Carry-Forward Lineage"]
+  H --> I["Processing History Audit Log & Executive Analytics"]
+```
+
+---
+
+## 3. Database Entity-Relationship (ER) Diagram
+
+```mermaid
+erDiagram
+  MEETING ||--o{ DECISION : "records"
+  MEETING ||--o{ ACTION_ITEM : "generates (sourceMeetingId)"
+  MEETING ||--o{ ACTION_ITEM : "tracks active (currentMeetingId)"
+  MEETING ||--o{ BLOCKER : "escalates"
+  MEETING ||--o{ CARRY_FORWARD_RECORD : "transfers across sessions"
+  MEETING ||--o{ PROCESSING_LOG_ENTRY : "audits ingestion & extraction"
+  PARTICIPANT ||--o{ ACTION_ITEM : "owns"
+  PARTICIPANT ||--o{ HANDOVER_RECORD : "transfers (fromPerson -> toPerson)"
+
+  MEETING {
+    string id PK
+    string title
+    string date "YYYY-MM-DD"
+    string[] participants
+    string agenda
+    string notes
+    string transcript
+    string aiSummary
+    string[] keyDiscussionPoints
+    string[] dependencies
+    string[] openIssues
+    string[] followUpRequirements
+    object ingestionMetadata
+  }
+
+  ACTION_ITEM {
+    string id PK
+    string title
+    string description
+    string owner "Name or Unassigned"
+    string priority "High | Medium | Low"
+    string deadline "YYYY-MM-DD or Unspecified"
+    string status "pending | in-progress | completed | overdue"
+    string sourceMeetingId FK
+    string currentMeetingId FK
+    string[] carriedFromMeetingIds
+    object[] statusHistory
+  }
+
+  PROCESSING_LOG_ENTRY {
+    string id PK
+    string meetingId FK
+    string timestamp
+    string inputType "manual | txt | csv | json | transcript-analysis"
+    string extractionStatus
+    int decisionsExtracted
+    int actionItemsExtracted
+    string validationStatus "Valid | Warning | Failed"
+    string[] errors
+    string[] warnings
+  }
+```
+
+---
+
+## 4. Backend REST API Reference
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/state` | Returns the complete structured database state (`AppDatabaseState`). |
+| `POST` | `/api/state/reset` | Resets workspace to the initial PwC India Q4 Business AI baseline. |
+| `POST` | `/api/meetings` | Creates a validated meeting record with duplicate submission checks. |
+| `POST` | `/api/meetings/ingest` | Ingests `TXT`, `CSV`, or `JSON` meeting payloads with optional auto-extraction. |
+| `PUT` | `/api/meetings/:id` | Updates meeting metadata, notes, or transcript and cascades title updates. |
+| `DELETE` | `/api/meetings/:id` | Deletes a meeting and its linked decisions/blockers. |
+| `POST` | `/api/ai/analyze-meeting` | Extracts structured summary, discussion points, decisions, action items, dependencies, open issues, and follow-up requirements. |
+| `POST` | `/api/meetings/:id/approve-analysis` | Commits human-verified AI extraction to the database and logs to `processingHistory`. |
+| `GET` | `/api/summaries` | Retrieves all meeting summaries, discussion points, dependencies, and open issues. |
+| `GET` | `/api/decisions` | Retrieves all formal decisions across meetings. |
+| `GET` | `/api/action-items` | Retrieves all action items / tasks with status history. |
+| `POST` | `/api/tasks` | Creates a validated task and prevents duplicate titles within the same meeting. |
+| `PATCH` | `/api/tasks/:id/status` | Updates task status (`pending`, `in-progress`, `completed`, `overdue`) and appends audit history. |
+| `POST` | `/api/tasks/:id/carry-forward` | Carries an unfinished task into a target meeting while preserving original source lineage. |
+| `GET` | `/api/analytics` | Calculates live KPIs, owner workload distribution, weekly trends, and data quality summary. |
+| `GET` | `/api/processing-history` | Returns chronological ingestion/extraction logs and live data quality audit. |
+| `GET` | `/api/data-quality` | Runs `evaluateWorkspaceDataQuality` across all entities and relationships. |
+
+---
+
+## 5. AI Extraction & Data Quality Workflow
+
+1. **Zero Hallucination Contract**: Missing task owners are strictly normalized to `"Unassigned"` and missing or non-ISO dates are normalized to `"Unspecified"`.
+2. **Pre-Save Schema Validation**: `validateAIAnalysisOutput()` deduplicates extracted tasks, validates `YYYY-MM-DD` deadlines, and generates `validationWarnings` for uncertain items.
+3. **Human-in-the-Loop Review**: Users can edit extracted summaries, decisions, owners, priorities, and deadlines in the **AI Intelligence** workspace before committing to the database.
+4. **Idempotent Approval**: Re-approving an analysis on the same meeting prevents duplicate task, decision, or blocker creation.
+
+---
+
+## 6. Demo Dataset (PwC India Scenario)
+
+The application ships with the **"Scenario: PwC India — Q4 Business AI & GenAI Delivery Review"** dataset featuring:
+- **Participants**: Ananya Sharma (Director, Business AI Advisory · Gurugram), Rohan Deshmukh (Lead Business AI Engineer · Bengaluru), Priya Nair (Senior Manager, AI Governance & Delivery · Mumbai).
+- **Meetings**:
+  - `mtg-q4-ops-1` (*Part 1: Enterprise RAG Architecture & Guardrails* — Oct 28, 2026): Analyzed with 2 decisions, 4 tasks, and 1 active DPDP/ISO 42001 compliance blocker.
+  - `mtg-q4-ops-2` (*Part 2: Production Rollout & Client Handover Sync* — Nov 2, 2026): Ready for live AI transcript extraction, carry-forward of overdue tasks, and executive report synthesis.
+
+---
+
+## 7. Installation & Testing Guide
+
 ```bash
+# 1. Install dependencies
 npm install
+
+# 2. Start the full-stack development server on port 3000
 npm run dev
+
+# 3. Run the automated unit & integration test suite
+npx tsx --test src/core/engine.test.ts
+
+# 4. Build for production
+npm run build
 ```
-The full-stack server and client will start on `http://localhost:3000`.
-
-### Running Automated QA Unit Tests
-```bash
-npm test
-# or directly:
-npx --yes tsx --test src/core/engine.test.ts
-```
-
----
-
-## 5. Known Limitations
-
-- **File-Backed Persistence Scope**: By default, persistent storage uses a local JSON database file (`data/syncmind-db.json`) on the server filesystem plus `localStorage` client mirroring so the application runs immediately with zero external cloud database setup. In a multi-replica stateless container cluster without a mounted volume, state is scoped to the container instance lifecycle.
-- **Reference Date**: To keep the preloaded *Q4 Business Operations Review* scenario deterministic (with exactly 1 completed, 2 pending, and 2 overdue tasks on launch), overdue status evaluation defaults to the scenario reference date `2026-11-02`.
