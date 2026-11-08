@@ -19,7 +19,7 @@ export const GUIDED_DEMO_STEPS: GuidedStepInfo[] = [
     stepNumber: 1,
     title: '1. Open Sample Meeting',
     description:
-      'Opening "PwC India Business AI Review — Part 2: Production Rollout & Client Handover Sync" in Meeting Management.',
+      'Opening "Enterprise FinTech & AI Review — Part 2: Production Rollout & Handover Sync" in Meeting Management.',
   },
   {
     stepNumber: 2,

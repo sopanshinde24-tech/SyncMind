@@ -1788,7 +1788,7 @@ export function executeCopilotTurn(
         nextState,
         matchedTask.id,
         'completed',
-        'Marked completed via PwC Business AI Copilot.'
+        'Marked completed via Enterprise AI Copilot.'
       );
       executedAction = `Completed Task: "${matchedTask.title}" (${matchedTask.owner})`;
       const metrics = calculateDashboardMetrics(nextState);
@@ -1824,7 +1824,7 @@ export function executeCopilotTurn(
           nextState,
           candidate.id,
           targetMtg.id,
-          'Carried forward via PwC Business AI Copilot.'
+          'Carried forward via Enterprise AI Copilot.'
         );
         executedAction = `Carried Forward: "${candidate.title}" → ${targetMtg.title}`;
         return {
@@ -1874,13 +1874,13 @@ export function executeCopilotTurn(
       msg.match(/task\s+for\s+[A-Za-z\s]+\s+to\s+(.+)/i);
     const rawTitle = titleMatch
       ? titleMatch[1].replace(/\s+by\s+\d{4}-\d{2}-\d{2}/i, '').trim()
-      : 'Prepare PwC India GenAI model risk & FinOps steering briefing';
+      : 'Prepare Q4 financial risk & FinOps steering briefing';
     const cleanTitle = rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1);
     const targetMtgId = nextState.meetings[1]?.id || nextState.meetings[0]?.id || 'mtg-q4-ops-2';
 
     nextState = createTask(nextState, {
       title: cleanTitle,
-      description: `${cleanTitle} (Created via PwC Business AI Copilot)`,
+      description: `${cleanTitle} (Created via Enterprise AI Copilot)`,
       owner,
       priority,
       deadline,
@@ -1888,7 +1888,7 @@ export function executeCopilotTurn(
     });
     executedAction = `Created Task: "${cleanTitle}" (${owner} · ${priority})`;
     return {
-      reply: `Created new **${priority} Priority** action item **"${cleanTitle}"** assigned to **${owner}** (Due: \`${deadline}\`) under the active PwC India Business AI Review meeting.`,
+      reply: `Created new **${priority} Priority** action item **"${cleanTitle}"** assigned to **${owner}** (Due: \`${deadline}\`) under the active Enterprise FinTech & AI Review meeting.`,
       executedAction,
       state: nextState,
       sourceEngine: 'deterministic-fallback',
@@ -1924,9 +1924,9 @@ export function executeCopilotTurn(
         `• **${o.owner}**: ${o.completed} completed, ${o.pending} pending, ${o.overdue} overdue (${o.completionRate}% completion)`
     );
     return {
-      reply: `**PwC India Business AI Team Workload Breakdown:**\n\n${ownerLines.join(
+      reply: `**Enterprise Engineering & Risk Team Workload Breakdown:**\n\n${ownerLines.join(
         '\n'
-      )}\n\nAcross ${metrics.totalMeetings} meetings, the practice has locked in **${metrics.totalDecisions} formal decisions** and maintains **${metrics.totalHandovers} active knowledge handover(s)**.`,
+      )}\n\nAcross ${metrics.totalMeetings} meetings, the team has locked in **${metrics.totalDecisions} formal decisions** and maintains **${metrics.totalHandovers} active knowledge handover(s)**.`,
       executedAction: null,
       state: nextState,
       sourceEngine: 'deterministic-fallback',
@@ -1934,7 +1934,7 @@ export function executeCopilotTurn(
   }
 
   return {
-    reply: `**PwC India Business AI Workspace Status:**\n• **Completion Rate:** ${metrics.completionRate}% (${metrics.completedTasks} completed, ${metrics.pendingTasks} pending, ${metrics.overdueTasks} overdue of ${metrics.totalTasks} tasks)\n• **Decisions & Blockers:** ${metrics.totalDecisions} formal decisions logged · ${metrics.activeBlockers} active blocker(s)\n• **Carried-Forward Lineage:** ${metrics.carriedForwardCount} task(s) carried across sessions\n\nTry asking me to:\n1. *"Show overdue tasks and DPDP compliance blockers"*\n2. *"Mark Priya Nair's compliance runbook task complete"*\n3. *"Carry forward Rohan's overdue LangChain task into Part 2"*`,
+    reply: `**Enterprise FinTech & AI Workspace Status:**\n• **Completion Rate:** ${metrics.completionRate}% (${metrics.completedTasks} completed, ${metrics.pendingTasks} pending, ${metrics.overdueTasks} overdue of ${metrics.totalTasks} tasks)\n• **Decisions & Blockers:** ${metrics.totalDecisions} formal decisions logged · ${metrics.activeBlockers} active blocker(s)\n• **Carried-Forward Lineage:** ${metrics.carriedForwardCount} task(s) carried across sessions\n\nTry asking me to:\n1. *"Show overdue tasks and DPDP compliance blockers"*\n2. *"Mark Priya Nair's compliance runbook task complete"*\n3. *"Carry forward Rohan's overdue LangChain task into Part 2"*`,
     executedAction: null,
     state: nextState,
     sourceEngine: 'deterministic-fallback',

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -63,6 +64,158 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const filteredBlockers = state.blockers.filter(
     (b) => selectedMemberFilter === 'all' || b.owner === selectedMemberFilter
   );
+
+  // Build chronological Recent Activity stream from live workspace state (Meetings, Tasks, Carry-Forwards, Handovers, Processing Logs)
+  interface RecentActivityEvent {
+    id: string;
+    type:
+      | 'meeting-created'
+      | 'task-completed'
+      | 'task-updated'
+      | 'handover-published'
+      | 'handover-acknowledged'
+      | 'task-carried-forward'
+      | 'ai-extraction';
+    categoryLabel: string;
+    title: string;
+    detail: string;
+    actor: string;
+    timestamp: string;
+    targetTab: string;
+    contextMeetingId?: string;
+  }
+
+  const recentActivities: RecentActivityEvent[] = (() => {
+    const events: RecentActivityEvent[] = [];
+
+    // 1. Meeting Creation Events
+    state.meetings.forEach((mtg) => {
+      const lead = mtg.participants[0] || 'Workspace Lead';
+      if (
+        selectedMemberFilter === 'all' ||
+        mtg.participants.includes(selectedMemberFilter)
+      ) {
+        events.push({
+          id: `act-mtg-${mtg.id}`,
+          type: 'meeting-created',
+          categoryLabel: 'Meeting Created',
+          title: mtg.title,
+          detail: `Scheduled for ${mtg.date} (${mtg.startTime}) with ${mtg.participants.length} participants`,
+          actor: lead,
+          timestamp: mtg.createdAt || `${mtg.date}T09:00:00Z`,
+          targetTab: 'meetings',
+          contextMeetingId: mtg.id,
+        });
+      }
+    });
+
+    // 2. Task Status Transitions & Completions
+    state.tasks.forEach((task) => {
+      if (selectedMemberFilter !== 'all' && task.owner !== selectedMemberFilter) {
+        return;
+      }
+      if (Array.isArray(task.statusHistory) && task.statusHistory.length > 0) {
+        const latestEntry = task.statusHistory[task.statusHistory.length - 1];
+        const isCompleted = latestEntry.toStatus === 'completed';
+        const isCreated = latestEntry.fromStatus === 'created';
+        events.push({
+          id: `act-task-${task.id}-${latestEntry.timestamp}`,
+          type: isCompleted ? 'task-completed' : 'task-updated',
+          categoryLabel: isCompleted
+            ? 'Task Completed'
+            : isCreated
+            ? 'Action Item Assigned'
+            : `Task Marked ${latestEntry.toStatus}`,
+          title: task.title,
+          detail: latestEntry.note || `Source: ${task.sourceMeetingTitle}`,
+          actor: task.owner,
+          timestamp: latestEntry.timestamp || task.completedAt || task.createdAt,
+          targetTab: 'tasks',
+          contextMeetingId: task.currentMeetingId,
+        });
+      }
+    });
+
+    // 3. Handover Publications & Acknowledgments
+    state.handovers.forEach((ho) => {
+      if (
+        selectedMemberFilter !== 'all' &&
+        ho.fromPerson !== selectedMemberFilter &&
+        ho.toPerson !== selectedMemberFilter
+      ) {
+        return;
+      }
+      events.push({
+        id: `act-ho-pub-${ho.id}`,
+        type: 'handover-published',
+        categoryLabel: 'Handover Published',
+        title: ho.title,
+        detail: `Work transfer package from ${ho.fromPerson} to ${ho.toPerson} (${ho.pendingTasks.length} open items)`,
+        actor: ho.fromPerson,
+        timestamp: ho.createdAt,
+        targetTab: 'handover',
+      });
+
+      if (ho.status === 'Acknowledged' && ho.acknowledgedAt) {
+        events.push({
+          id: `act-ho-ack-${ho.id}`,
+          type: 'handover-acknowledged',
+          categoryLabel: 'Handover Acknowledged',
+          title: ho.title,
+          detail: ho.acknowledgmentNote || `Signed off by ${ho.toPerson}`,
+          actor: ho.toPerson,
+          timestamp: ho.acknowledgedAt,
+          targetTab: 'handover',
+        });
+      }
+    });
+
+    // 4. Carry-Forward Operations
+    state.carryForwardHistory.forEach((cf) => {
+      if (selectedMemberFilter !== 'all' && cf.owner !== selectedMemberFilter) {
+        return;
+      }
+      events.push({
+        id: `act-cf-${cf.id}`,
+        type: 'task-carried-forward',
+        categoryLabel: 'Task Carried Forward',
+        title: cf.taskTitle,
+        detail: `Carried from "${cf.fromMeetingTitle.split('—')[0].trim()}" into "${
+          cf.toMeetingTitle.split('—')[1]?.trim() || cf.toMeetingTitle
+        }"`,
+        actor: cf.owner,
+        timestamp: cf.carriedAt,
+        targetTab: 'carry-forward',
+        contextMeetingId: cf.toMeetingId,
+      });
+    });
+
+    // 5. AI Extraction & Processing Logs
+    (state.processingHistory || []).forEach((proc) => {
+      if (proc.extractionStatus === 'Completed') {
+        events.push({
+          id: `act-proc-${proc.id}`,
+          type: 'ai-extraction',
+          categoryLabel: 'AI Intelligence Extracted',
+          title: proc.meetingTitle,
+          detail: `Extracted ${proc.decisionsExtracted} decisions and ${proc.actionItemsExtracted} action items (${proc.validationStatus})`,
+          actor: 'SyncMind AI Engine',
+          timestamp: proc.timestamp,
+          targetTab: 'processing-history',
+          contextMeetingId: proc.meetingId,
+        });
+      }
+    });
+
+    return events
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 5);
+  })();
+
+  const formatActivityTimestamp = (iso: string): string => {
+    if (!iso) return 'Recent';
+    return iso.slice(0, 16).replace('T', ' ');
+  };
 
   return (
     <div className="space-y-6" data-testid="dashboard-view">
@@ -441,7 +594,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </section>
 
-      {/* Main Two-Column Operational Split: Recent Meetings, Decisions & Work Transfers vs Action Items Requiring Attention */}
+      {/* Main Two-Column Operational Split: Recent Meetings, Decisions & Work Transfers vs Action Items & Recent Activity */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left 7 Columns: Recent Meetings, Decisions & Work Transfer Activity */}
         <div className="lg:col-span-7 space-y-6">
@@ -633,7 +786,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Right 5 Columns: Action Items Requiring Attention + AI Copilot Card */}
+        {/* Right 5 Columns: Action Items Requiring Attention + Recent Activity Timeline + AI Copilot Card */}
         <div className="lg:col-span-5 space-y-6">
           <div className="bg-white border border-slate-200 rounded-xl shadow-2xs">
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
@@ -729,6 +882,137 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <p className="text-xs text-slate-500 mt-1">
                     Select &ldquo;All Leads&rdquo; or create a new action item.
                   </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Recent Activity Widget — Vertical Timeline of Last 5 Operations */}
+          <div
+            className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden"
+            data-testid="recent-activity-widget"
+          >
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">Recent Activity</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Last {recentActivities.length} operations across meetings, tasks, and handovers
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigate('processing-history')}
+                className="text-xs font-medium text-indigo-600 hover:underline whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                Audit Log
+              </button>
+            </div>
+
+            <div className="p-5">
+              {recentActivities.length > 0 ? (
+                <ol
+                  className="relative border-l border-slate-200 ml-3 space-y-5"
+                  data-testid="recent-activity-timeline"
+                >
+                  <AnimatePresence mode="popLayout" initial={true}>
+                    {recentActivities.map((item, index) => {
+                      const iconConfig =
+                        item.type === 'task-completed'
+                          ? {
+                              Icon: CheckCircle2,
+                              nodeBg: 'bg-emerald-50 border-emerald-200 text-emerald-600',
+                              labelTone: 'text-emerald-700',
+                            }
+                          : item.type === 'handover-published' ||
+                            item.type === 'handover-acknowledged'
+                          ? {
+                              Icon: Briefcase,
+                              nodeBg: 'bg-violet-50 border-violet-200 text-violet-600',
+                              labelTone: 'text-violet-700',
+                            }
+                          : item.type === 'task-carried-forward'
+                          ? {
+                              Icon: CornerDownRight,
+                              nodeBg: 'bg-indigo-50 border-indigo-200 text-indigo-600',
+                              labelTone: 'text-indigo-700',
+                            }
+                          : item.type === 'ai-extraction'
+                          ? {
+                              Icon: Sparkles,
+                              nodeBg: 'bg-indigo-50 border-indigo-200 text-indigo-600',
+                              labelTone: 'text-indigo-700',
+                            }
+                          : item.type === 'meeting-created'
+                          ? {
+                              Icon: Calendar,
+                              nodeBg: 'bg-slate-100 border-slate-300 text-slate-700',
+                              labelTone: 'text-slate-700',
+                            }
+                          : {
+                              Icon: Clock,
+                              nodeBg: 'bg-amber-50 border-amber-200 text-amber-600',
+                              labelTone: 'text-amber-700',
+                            };
+
+                      const ItemIcon = iconConfig.Icon;
+
+                      return (
+                        <motion.li
+                          key={item.id}
+                          layout
+                          initial={{ opacity: 0, y: -18 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 12 }}
+                          transition={{
+                            duration: 0.28,
+                            delay: index * 0.04,
+                            ease: [0.22, 1, 0.36, 1],
+                          }}
+                          className="relative ml-5 group"
+                          data-testid="recent-activity-item"
+                        >
+                          <span
+                            className={`absolute -left-8 top-0.5 flex items-center justify-center w-6 h-6 rounded-full border ${iconConfig.nodeBg}`}
+                          >
+                            <ItemIcon className="w-3.5 h-3.5" />
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => onNavigate(item.targetTab, item.contextMeetingId)}
+                            className="w-full text-left hover:bg-slate-50 p-2 -m-2 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                              <div className="flex items-center gap-1.5">
+                                <span className={`font-semibold ${iconConfig.labelTone}`}>
+                                  {item.categoryLabel}
+                                </span>
+                                <span aria-hidden="true" className="text-slate-300">
+                                  ·
+                                </span>
+                                <span className="text-slate-600">{item.actor}</span>
+                              </div>
+                              <time className="text-[11px] font-mono tabular-nums text-slate-400">
+                                {formatActivityTimestamp(item.timestamp)}
+                              </time>
+                            </div>
+
+                            <div className="mt-1 text-xs font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
+                              {item.title}
+                            </div>
+
+                            <p className="mt-0.5 text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
+                              {item.detail}
+                            </p>
+                          </button>
+                        </motion.li>
+                      );
+                    })}
+                  </AnimatePresence>
+                </ol>
+              ) : (
+                <div className="py-6 text-center text-xs text-slate-500">
+                  No recent operations recorded for this filter.
                 </div>
               )}
             </div>

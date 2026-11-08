@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Calendar,
@@ -11,6 +11,8 @@ import {
   FileSpreadsheet,
   FileText,
   GitBranch,
+  Mic,
+  MicOff,
   Plus,
   Search,
   ShieldCheck,
@@ -22,6 +24,54 @@ import {
 } from 'lucide-react';
 import { AppDatabaseState, Meeting } from '../core/types';
 import { ParticipantAvatar } from './ParticipantAvatar';
+
+interface SpeechRecognitionAlternativeLike {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognitionResultLike {
+  isFinal: boolean;
+  length: number;
+  [index: number]: SpeechRecognitionAlternativeLike;
+}
+
+interface SpeechRecognitionResultListLike {
+  length: number;
+  [index: number]: SpeechRecognitionResultLike;
+}
+
+interface SpeechRecognitionEventLike extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultListLike;
+}
+
+interface SpeechRecognitionErrorEventLike extends Event {
+  error: string;
+  message?: string;
+}
+
+interface SpeechRecognitionInstance {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
+
+function getSpeechRecognitionConstructor(): SpeechRecognitionConstructor | null {
+  if (typeof window === 'undefined') return null;
+  const win = window as unknown as {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  };
+  return win.SpeechRecognition || win.webkitSpeechRecognition || null;
+}
 
 interface MeetingsViewProps {
   state: AppDatabaseState;
@@ -62,7 +112,7 @@ interface MeetingsViewProps {
   onOpenAIAssistant: (meetingId: string) => void;
 }
 
-const SAMPLE_TXT_PAYLOAD = `Title: PwC India BFSI GenAI Security & RBI Firewall Sync
+const SAMPLE_TXT_PAYLOAD = `Title: Enterprise FinTech BFSI Security & RBI Firewall Sync
 Date: 2026-11-05
 Participants: Ananya Sharma, Rohan Deshmukh, Priya Nair
 Agenda: 1. Unblock RBI cloud firewall IP whitelisting 2. Validate DPDP telemetry encryption
@@ -72,12 +122,12 @@ Notes: Urgent security sync between Gurugram, Bengaluru, and Mumbai teams.
 [00:02:10] Priya Nair: I will share the updated RBI cloud firewall compliance attestation packet with client InfoSec by 2026-11-07.`;
 
 const SAMPLE_CSV_PAYLOAD = `title,date,participants,agenda,decision,actionItem,owner,priority,deadline
-"PwC India Q4 FinOps & Token Cost Optimization Sync",2026-11-06,"Ananya Sharma|Rohan Deshmukh|Priya Nair","1. Review Q4 Gemini token utilization 2. Approve semantic caching tier","Enable Redis semantic response caching for repetitive BFSI compliance queries","Deploy semantic cache layer on Bengaluru staging cluster","Rohan Deshmukh",High,2026-11-08
-"PwC India Q4 FinOps & Token Cost Optimization Sync",2026-11-06,"Ananya Sharma|Rohan Deshmukh|Priya Nair","1. Review Q4 Gemini token utilization 2. Approve semantic caching tier","","Publish monthly FinOps token budget allocation per Partner practice","Ananya Sharma",Medium,2026-11-09`;
+"Enterprise Q4 FinOps & Token Cost Optimization Sync",2026-11-06,"Ananya Sharma|Rohan Deshmukh|Priya Nair","1. Review Q4 Gemini token utilization 2. Approve semantic caching tier","Enable Redis semantic response caching for repetitive BFSI compliance queries","Deploy semantic cache layer on Bengaluru staging cluster","Rohan Deshmukh",High,2026-11-08
+"Enterprise Q4 FinOps & Token Cost Optimization Sync",2026-11-06,"Ananya Sharma|Rohan Deshmukh|Priya Nair","1. Review Q4 Gemini token utilization 2. Approve semantic caching tier","","Publish monthly FinOps token budget allocation per product squad","Ananya Sharma",Medium,2026-11-09`;
 
 const SAMPLE_JSON_PAYLOAD = JSON.stringify(
   {
-    title: 'PwC India Responsible AI Red-Team & Guardrails Review',
+    title: 'Enterprise Responsible AI Red-Team & Guardrails Review',
     date: '2026-11-07',
     startTime: '02:30 PM',
     durationMinutes: 45,
@@ -170,7 +220,141 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
   const [ingestError, setIngestError] = useState<string | null>(null);
   const [ingesting, setIngesting] = useState(false);
 
+  // Browser SpeechRecognition Dictation State (supports both Detail View & Modal Transcript fields)
+  const [dictationTarget, setDictationTarget] = useState<'detail' | 'modal' | null>(null);
+  const [interimSpeech, setInterimSpeech] = useState('');
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const activeMeetingRef = useRef<Meeting | null>(activeMeeting);
+  activeMeetingRef.current = activeMeeting;
+
+  const stopDictation = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.stop();
+      } catch {
+        // Ignore stop errors if already stopped
+      }
+      recognitionRef.current = null;
+    }
+    setDictationTarget(null);
+    setInterimSpeech('');
+  };
+
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.onend = null;
+          recognitionRef.current.stop();
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+    };
+  }, []);
+
+  const toggleDictation = (target: 'detail' | 'modal') => {
+    setSpeechError(null);
+
+    if (dictationTarget === target) {
+      stopDictation();
+      return;
+    }
+
+    // Stop any existing session before starting a new target
+    if (recognitionRef.current) {
+      stopDictation();
+    }
+
+    const RecognitionCtor = getSpeechRecognitionConstructor();
+    if (!RecognitionCtor) {
+      setSpeechError(
+        'SpeechRecognition API is not supported in this browser. Please use Chrome, Edge, or Safari.'
+      );
+      return;
+    }
+
+    try {
+      const recognition = new RecognitionCtor();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event: SpeechRecognitionEventLike) => {
+        let finalChunk = '';
+        let interimChunk = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i += 1) {
+          const result = event.results[i];
+          const text = result[0]?.transcript || '';
+          if (result.isFinal) {
+            finalChunk += text;
+          } else {
+            interimChunk += text;
+          }
+        }
+
+        setInterimSpeech(interimChunk.trim());
+
+        const cleanedFinal = finalChunk.trim();
+        if (cleanedFinal) {
+          const now = new Date();
+          const timestampLabel = `[${String(now.getHours()).padStart(2, '0')}:${String(
+            now.getMinutes()
+          ).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}]`;
+          const speakerName = state.participants[0]?.name || 'Sopan Shinde';
+          const formattedLine = `${timestampLabel} ${speakerName}: ${cleanedFinal}`;
+
+          if (target === 'modal') {
+            setTranscript((prev) => {
+              const trimmedPrev = prev.trim();
+              return trimmedPrev ? `${trimmedPrev}\n${formattedLine}` : formattedLine;
+            });
+          } else if (target === 'detail' && activeMeetingRef.current) {
+            const currentMtg = activeMeetingRef.current;
+            const trimmedExisting = (currentMtg.transcript || '').trim();
+            const updatedTranscript = trimmedExisting
+              ? `${trimmedExisting}\n${formattedLine}`
+              : formattedLine;
+            void onUpdateMeeting(currentMtg.id, { transcript: updatedTranscript });
+          }
+        }
+      };
+
+      recognition.onerror = (event: SpeechRecognitionErrorEventLike) => {
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          setSpeechError(
+            'Microphone access was denied. Please allow microphone permissions to dictate notes.'
+          );
+        } else if (event.error !== 'aborted' && event.error !== 'no-speech') {
+          setSpeechError(`Speech recognition error: ${event.error}`);
+        }
+        setDictationTarget(null);
+        setInterimSpeech('');
+      };
+
+      recognition.onend = () => {
+        setDictationTarget(null);
+        setInterimSpeech('');
+        recognitionRef.current = null;
+      };
+
+      recognitionRef.current = recognition;
+      setDictationTarget(target);
+      recognition.start();
+    } catch (err: unknown) {
+      setSpeechError(
+        err instanceof Error ? err.message : 'Unable to start browser speech recognition.'
+      );
+      setDictationTarget(null);
+    }
+  };
+
   const openCreateModal = () => {
+    stopDictation();
+    setSpeechError(null);
     setEditingMeetingId(null);
     setTitle('');
     setDate('2026-11-04');
@@ -185,6 +369,8 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
   };
 
   const openEditModal = (meeting: Meeting) => {
+    stopDictation();
+    setSpeechError(null);
     setEditingMeetingId(meeting.id);
     setTitle(meeting.title);
     setDate(meeting.date);
@@ -873,21 +1059,83 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
 
               {/* Full Verbatim Transcript */}
               <div className="p-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <h3 className="text-xs font-semibold text-slate-700 inline-flex items-center gap-1.5">
                     <FileText className="w-3.5 h-3.5 text-indigo-600" />
                     Meeting Transcript (Source of Truth for AI Extraction)
                   </h3>
-                  <span className="text-xs text-slate-500 font-mono tabular-nums">
-                    {activeMeeting.transcript.split(/\r?\n/).filter(Boolean).length} speaker lines
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-slate-500 font-mono tabular-nums">
+                      {activeMeeting.transcript.split(/\r?\n/).filter(Boolean).length} speaker lines
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => toggleDictation('detail')}
+                      data-testid="dictate-transcript-btn"
+                      aria-pressed={dictationTarget === 'detail'}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors inline-flex items-center gap-1.5 cursor-pointer ${
+                        dictationTarget === 'detail'
+                          ? 'bg-red-600 text-white border-red-600 hover:bg-red-700'
+                          : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                      }`}
+                    >
+                      {dictationTarget === 'detail' ? (
+                        <>
+                          <MicOff className="w-3.5 h-3.5 animate-pulse" />
+                          Stop Dictation
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="w-3.5 h-3.5" />
+                          Dictate Meeting Notes
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
-                <div
-                  className="mt-3 bg-slate-900 text-slate-100 p-4 rounded-xl text-xs font-mono leading-relaxed whitespace-pre-wrap max-h-72 overflow-y-auto"
+
+                {speechError && !isFormOpen && (
+                  <div
+                    className="mt-2.5 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-center justify-between gap-2"
+                    data-testid="speech-recognition-status"
+                  >
+                    <span>{speechError}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSpeechError(null)}
+                      className="text-amber-700 hover:text-amber-900 font-semibold cursor-pointer"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
+
+                {dictationTarget === 'detail' && (
+                  <div
+                    className="mt-2.5 p-3 bg-red-50/80 border border-red-200 rounded-lg text-xs text-red-900 flex items-center justify-between gap-3"
+                    data-testid="live-dictation-banner"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-red-600 animate-ping shrink-0" />
+                      <span className="font-semibold">Listening via SpeechRecognition...</span>
+                      <span className="text-red-700 italic">
+                        {interimSpeech || 'Speak clearly to append directly into the transcript.'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <textarea
+                  aria-label="Meeting transcript field"
+                  value={activeMeeting.transcript}
+                  onChange={(e) =>
+                    void onUpdateMeeting(activeMeeting.id, { transcript: e.target.value })
+                  }
+                  rows={8}
+                  placeholder="No transcript provided yet. Type or click 'Dictate Meeting Notes' to dictate directly into the transcript..."
+                  className="mt-3 w-full bg-slate-900 text-slate-100 p-4 rounded-xl text-xs font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-600"
                   data-testid="meeting-transcript-box"
-                >
-                  {activeMeeting.transcript || 'No transcript provided yet.'}
-                </div>
+                />
               </div>
             </div>
           ) : null}
@@ -1181,18 +1429,60 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
               </div>
 
               <div>
-                <label
-                  htmlFor="meeting-transcript-input"
-                  className="block text-xs font-medium text-slate-700 mb-1"
-                >
-                  Verbatim Transcript
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label
+                    htmlFor="meeting-transcript-input"
+                    className="block text-xs font-medium text-slate-700"
+                  >
+                    Verbatim Transcript
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => toggleDictation('modal')}
+                    data-testid="dictate-modal-transcript-btn"
+                    aria-pressed={dictationTarget === 'modal'}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-md border transition-colors inline-flex items-center gap-1.5 cursor-pointer ${
+                      dictationTarget === 'modal'
+                        ? 'bg-red-600 text-white border-red-600 hover:bg-red-700'
+                        : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                    }`}
+                  >
+                    {dictationTarget === 'modal' ? (
+                      <>
+                        <MicOff className="w-3.5 h-3.5 animate-pulse" />
+                        Stop Dictation
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="w-3.5 h-3.5" />
+                        Dictate Notes
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {speechError && isFormOpen && (
+                  <div className="mb-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                    {speechError}
+                  </div>
+                )}
+
+                {dictationTarget === 'modal' && (
+                  <div className="mb-2 p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-900 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-red-600 animate-ping shrink-0" />
+                    <span className="font-semibold">Dictating:</span>
+                    <span className="italic text-red-700">
+                      {interimSpeech || 'Listening for meeting notes...'}
+                    </span>
+                  </div>
+                )}
+
                 <textarea
                   id="meeting-transcript-input"
                   rows={5}
                   value={transcript}
                   onChange={(e) => setTranscript(e.target.value)}
-                  placeholder="[00:00:10] Ananya Sharma: Let's align on our Q4 deliverables..."
+                  placeholder="[00:00:10] Sopan Shinde: Let's align on our Q4 deliverables..."
                   className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>

@@ -58,7 +58,7 @@ export const HandoverView: React.FC<HandoverViewProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
 
   const openModalWithAutoPopulate = () => {
-    setTitle('PwC India Business AI Engineering Q4 Sprint & Guardrail Handover');
+    setTitle('Enterprise FinTech & AI Engineering Q4 Sprint & Guardrail Handover');
     setProjectContext(
       'Knowledge transfer covering Mumbai region RAG vector-index benchmarks, BFSI agentic PII guardrail deployment status, and RBI / DPDP Act compliance protocols.'
     );

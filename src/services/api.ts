@@ -19,7 +19,7 @@ import {
 import { createInitialSeedState } from '../core/seedData';
 import { AIAnalysisResult, AppDatabaseState, TaskPriority, TaskStatus } from '../core/types';
 
-const LOCAL_STORAGE_KEY = 'syncmind_ai_pwc_state_v2';
+const LOCAL_STORAGE_KEY = 'syncmind_creditvision_sopan_state_v4';
 
 function saveLocalMirror(state: AppDatabaseState): void {
   try {
@@ -34,7 +34,13 @@ export function loadLocalMirror(): AppDatabaseState {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as AppDatabaseState;
-      if (parsed && Array.isArray(parsed.meetings) && Array.isArray(parsed.tasks)) {
+      if (
+        parsed &&
+        Array.isArray(parsed.meetings) &&
+        Array.isArray(parsed.tasks) &&
+        Array.isArray(parsed.participants) &&
+        parsed.participants.some((p) => p.name === 'Sopan Shinde')
+      ) {
         if (!Array.isArray(parsed.processingHistory)) {
           parsed.processingHistory = createInitialSeedState().processingHistory;
         }

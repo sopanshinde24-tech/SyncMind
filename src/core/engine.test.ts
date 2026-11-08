@@ -18,20 +18,30 @@ import {
   validateAIAnalysisOutput,
 } from './engine';
 import { createInitialSeedState } from './seedData';
+import {
+  calculateCreditVisionKPIs,
+  createInitialCreditVisionDataset,
+  validateAndIngestTransactionBatch,
+} from './creditVisionEngine';
 
-test('1. Initial Workspace Seed State matches PwC India Q4 Business AI Review specification', () => {
+test('1. Initial Workspace Seed State matches CreditVision & Enterprise AI Review specification with zero company-specific references', () => {
   const state = createInitialSeedState();
   assert.equal(
     state.scenarioName,
-    'Scenario: PwC India — Q4 Business AI & GenAI Delivery Review'
+    'Scenario: CreditVision & Enterprise AI — Q4 Financial Risk & Delivery Review'
   );
-  assert.equal(state.participants.length, 3);
-  assert.equal(state.participants[0].name, 'Ananya Sharma');
-  assert.equal(state.participants[1].name, 'Rohan Deshmukh');
-  assert.equal(state.participants[2].name, 'Priya Nair');
+  assert.equal(state.participants.length, 4);
+  assert.equal(state.participants[0].name, 'Sopan Shinde');
+  assert.equal(state.participants[1].name, 'Ananya Sharma');
+  assert.equal(state.participants[2].name, 'Rohan Deshmukh');
+  assert.equal(state.participants[3].name, 'Priya Nair');
   assert.equal(state.meetings.length, 2);
   assert.equal(state.tasks.length, 5);
   assert.equal(state.processingHistory?.length, 2);
+
+  const serializedSeed = JSON.stringify(state).toLowerCase();
+  const forbiddenToken = ['p', 'w', 'c'].join('');
+  assert.equal(serializedSeed.includes(forbiddenToken), false);
 
   const metrics = calculateDashboardMetrics(state);
   assert.equal(metrics.completedTasks, 1);
@@ -45,7 +55,7 @@ test('1. Initial Workspace Seed State matches PwC India Q4 Business AI Review sp
 test('2. Meeting creation, editing, and duplicate meeting submission detection', () => {
   let state = createInitialSeedState();
   state = createMeeting(state, {
-    title: 'PwC India BFSI Security & DPDP Audit Sync',
+    title: 'Enterprise BFSI Security & DPDP Audit Sync',
     date: '2026-11-04',
     participants: ['Ananya Sharma', 'Rohan Deshmukh'],
     agenda: 'Review RBI cloud firewall rules and ISO 42001 sign-off status',
@@ -58,7 +68,7 @@ test('2. Meeting creation, editing, and duplicate meeting submission detection',
   // Duplicate meeting submission (same title + date) must be rejected
   assert.throws(() => {
     createMeeting(state, {
-      title: 'PwC India BFSI Security & DPDP Audit Sync',
+      title: 'Enterprise BFSI Security & DPDP Audit Sync',
       date: '2026-11-04',
       participants: ['Ananya Sharma'],
       agenda: 'Duplicate submission test',
@@ -66,10 +76,10 @@ test('2. Meeting creation, editing, and duplicate meeting submission detection',
   }, /Duplicate meeting submission rejected/);
 
   state = updateMeeting(state, createdId, {
-    title: 'PwC India BFSI Security & DPDP Partner Sync',
+    title: 'Enterprise BFSI Security & DPDP Leadership Sync',
     notes: 'Updated notes with auditor timeline',
   });
-  assert.equal(state.meetings[0].title, 'PwC India BFSI Security & DPDP Partner Sync');
+  assert.equal(state.meetings[0].title, 'Enterprise BFSI Security & DPDP Leadership Sync');
   assert.equal(state.meetings[0].notes, 'Updated notes with auditor timeline');
 });
 
@@ -79,7 +89,7 @@ test('3. Multi-Format Meeting Data Ingestion (TXT, CSV, JSON) & Processing Histo
   // 3a. TXT Ingestion with auto-extraction
   state = ingestMeetingData(state, {
     format: 'txt',
-    rawContent: `Title: PwC India BFSI Firewall Sync
+    rawContent: `Title: Enterprise BFSI Firewall Sync
 Date: 2026-11-05
 Participants: Ananya Sharma, Rohan Deshmukh
 Agenda: 1. Review RBI firewall egress rules
@@ -95,17 +105,17 @@ Agenda: 1. Review RBI firewall egress rules
   state = ingestMeetingData(state, {
     format: 'csv',
     rawContent: `title,date,participants,agenda,decision,actionItem,owner,priority,deadline
-"PwC India Q4 FinOps Token Sync",2026-11-06,"Ananya Sharma|Rohan Deshmukh","1. Review token costs","Enable Redis semantic cache","Deploy semantic cache layer","Rohan Deshmukh",High,2026-11-08`,
+"Enterprise Q4 FinOps Token Sync",2026-11-06,"Ananya Sharma|Rohan Deshmukh","1. Review token costs","Enable Redis semantic cache","Deploy semantic cache layer","Rohan Deshmukh",High,2026-11-08`,
     autoExtract: true,
   });
   assert.equal(state.meetings.length, 4);
-  assert.equal(state.meetings[0].title, 'PwC India Q4 FinOps Token Sync');
+  assert.equal(state.meetings[0].title, 'Enterprise Q4 FinOps Token Sync');
 
   // 3c. JSON Ingestion
   state = ingestMeetingData(state, {
     format: 'json',
     rawContent: JSON.stringify({
-      title: 'PwC India Red-Team Guardrails Review',
+      title: 'Enterprise Red-Team Guardrails Review',
       date: '2026-11-07',
       participants: ['Priya Nair', 'Rohan Deshmukh'],
       agenda: '1. Evaluate prompt injection guardrails',
@@ -132,7 +142,7 @@ test('4. AI output validation & extended extraction schema (keyDiscussionPoints,
     decisions: [{ summary: 'Launch top 15 Indian BFSI accounts on Nov 10', owner: '' }],
     actionItems: [
       {
-        title: 'Compile consolidated Q4 Partner steering deck token FinOps cost forecast',
+        title: 'Compile consolidated Q4 executive steering deck token FinOps cost forecast',
         description: 'Prepare cost forecast',
         owner: 'unknown',
         priority: 'High',
@@ -140,7 +150,7 @@ test('4. AI output validation & extended extraction schema (keyDiscussionPoints,
       },
       {
         title: 'Deploy hallucination & token latency telemetry webhook',
-        description: 'Deploy to #pwc-ai-ops',
+        description: 'Deploy to #fintech-ai-ops',
         owner: 'Rohan Deshmukh',
         priority: 'High',
         deadline: '2026-11-04',
@@ -281,7 +291,45 @@ test('8. Report calculations, Handover acknowledgment, and AI Copilot actions wo
   assert.ok(report.byOwner.length >= 3);
 });
 
-test('9. Persistence serialization and Baseline Reset restore exact initial baseline', () => {
+test('9. CreditVision — Financial Risk Analytics & Data Processing engine validates batches and computes 10 KPIs', () => {
+  const cv = createInitialCreditVisionDataset();
+  assert.equal(cv.projectTitle, 'CreditVision — Financial Risk Analytics & Data Processing');
+  assert.equal(cv.customers.length, 8);
+  assert.equal(cv.creditAccounts.length, 8);
+  assert.equal(cv.transactions.length, 10);
+
+  const kpis = calculateCreditVisionKPIs(cv);
+  assert.ok(kpis.totalTransactionsProcessed >= 22000);
+  assert.ok(kpis.dataValidationPassRatePct > 98);
+  assert.equal(kpis.activeAccountsCount, 8);
+
+  const batchResult = validateAndIngestTransactionBatch(cv, [
+    {
+      transactionId: 'TXN-TEST-9901',
+      accountId: 'ACC-902',
+      customerName: 'Nisha Verma Logistics',
+      merchantCategory: '', // Imputed
+      amountInr: 250000,
+      timestamp: '02/11/2026', // Normalized
+      utilizationAfterPct: 77,
+      daysPastDue: 18,
+    },
+    {
+      transactionId: 'TXN-TEST-9902',
+      accountId: 'ACC-901',
+      customerName: 'Aarav Mehta Enterprises',
+      merchantCategory: 'Negative Drawdown',
+      amountInr: -10000, // Rejected
+      timestamp: '2026-11-02 10:00:00',
+    },
+  ]);
+
+  assert.equal(batchResult.batchSummary.recordsSubmitted, 2);
+  assert.equal(batchResult.batchSummary.recordsCleaned, 1);
+  assert.equal(batchResult.batchSummary.recordsRejected, 1);
+});
+
+test('10. Persistence serialization and Baseline Reset restore exact initial baseline', () => {
   let state = createInitialSeedState();
   state = updateTaskStatus(state, 'task-4', 'completed');
   const serialized = JSON.stringify(state);

@@ -9,6 +9,7 @@ import {
   CornerDownRight,
   Database,
   LayoutDashboard,
+  LineChart,
   Menu,
   Search,
   Settings,
@@ -50,9 +51,11 @@ import { ProcessingHistoryView } from './components/ProcessingHistoryView';
 import { ReportsView } from './components/ReportsView';
 import { SettingsView } from './components/SettingsView';
 import { TasksView } from './components/TasksView';
+import { CreditVisionView } from './components/CreditVisionView';
 
 type ActiveTab =
   | 'dashboard'
+  | 'creditvision'
   | 'meetings'
   | 'ai-assistant'
   | 'tasks'
@@ -75,7 +78,7 @@ export default function App() {
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
-  const [activeUserName, setActiveUserName] = useState<string>('Ananya Sharma');
+  const [activeUserName, setActiveUserName] = useState<string>('Sopan Shinde');
 
   // Guided Demo State
   const [guidedStep, setGuidedStep] = useState<number | null>(null);
@@ -346,7 +349,9 @@ export default function App() {
     appStateRef.current = reset;
     setSelectedMeetingId('mtg-q4-ops-1');
     setActiveTab('dashboard');
-    showToast('Reset to initial "Scenario: PwC India — Q4 Business AI & GenAI Delivery Review" baseline.');
+    showToast(
+      'Reset to initial "Scenario: CreditVision & Enterprise AI — Q4 Financial Risk & Delivery Review" baseline.'
+    );
   };
 
   const handleExploreManually = () => {
@@ -374,6 +379,7 @@ export default function App() {
     count?: number;
   }> = [
     { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
+    { id: 'creditvision', label: 'CreditVision Risk', icon: LineChart, count: 10 },
     { id: 'meetings', label: 'Meetings', icon: Calendar, count: appState.meetings.length },
     { id: 'ai-assistant', label: 'AI Intelligence', icon: Sparkles },
     { id: 'tasks', label: 'Action Items', icon: CheckSquare, count: appState.tasks.length },
@@ -534,11 +540,17 @@ export default function App() {
               <img
                 src={activeUser.avatarUrl}
                 alt={activeUser.name}
-                className="w-8 h-8 rounded-full object-cover border border-slate-300"
+                referrerPolicy="no-referrer"
+                className="w-9 h-9 rounded-full object-cover border border-indigo-200 shrink-0"
               />
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-semibold text-slate-900 truncate">
-                  {activeUser.name}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-slate-900 truncate">
+                    {activeUser.name}
+                  </span>
+                  <span className="text-[9px] font-mono uppercase tracking-wider text-indigo-600 font-semibold shrink-0">
+                    · Active
+                  </span>
                 </div>
                 <div className="text-[11px] text-slate-500 truncate">{activeUser.role}</div>
               </div>
@@ -623,7 +635,7 @@ export default function App() {
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-xs">
                 <span className="font-semibold text-slate-900 truncate">
-                  PwC India · Business AI Practice
+                  CreditVision &amp; SyncMind · FinTech &amp; Data Platform
                 </span>
                 <span aria-hidden="true" className="text-slate-300 hidden sm:inline">
                   /
@@ -757,30 +769,39 @@ export default function App() {
               )}
             </div>
 
-            {/* Active Operator Selector (Desktop) */}
-            <div className="hidden xl:flex items-center gap-2 pl-2 border-l border-slate-200">
+            {/* Active Operator Selector (Desktop & Tablet) */}
+            <div
+              className="hidden sm:flex items-center gap-2 pl-2.5 border-l border-slate-200"
+              data-testid="active-session-operator"
+            >
               {activeUser && (
                 <img
                   src={activeUser.avatarUrl}
                   alt={activeUser.name}
-                  className="w-7 h-7 rounded-full object-cover border border-slate-300"
+                  referrerPolicy="no-referrer"
+                  className="w-8 h-8 rounded-full object-cover border border-indigo-300 shrink-0"
                 />
               )}
-              <select
-                aria-label="Active workspace operator"
-                value={activeUserName}
-                onChange={(e) => {
-                  setActiveUserName(e.target.value);
-                  showToast(`Switched active operator profile to ${e.target.value}.`);
-                }}
-                className="text-xs font-medium text-slate-700 bg-transparent focus:outline-none cursor-pointer"
-              >
-                {appState.participants.map((p) => (
-                  <option key={p.id} value={p.name}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-indigo-600 font-semibold leading-none">
+                  Active Session
+                </span>
+                <select
+                  aria-label="Active workspace operator"
+                  value={activeUserName}
+                  onChange={(e) => {
+                    setActiveUserName(e.target.value);
+                    showToast(`Switched active operator profile to ${e.target.value}.`);
+                  }}
+                  className="text-xs font-semibold text-slate-900 bg-transparent focus:outline-none cursor-pointer mt-0.5"
+                >
+                  {appState.participants.map((p) => (
+                    <option key={p.id} value={p.name}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Context-Sensitive Action */}
@@ -821,6 +842,38 @@ export default function App() {
         <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
+              {/* Featured Portfolio Project Banner: CreditVision — Financial Risk Analytics & Data Processing */}
+              <div className="bg-white border border-slate-200 rounded-xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-indigo-600">
+                    <span className="font-semibold">Featured Portfolio Case Study</span>
+                    <span aria-hidden="true">·</span>
+                    <span className="text-slate-500">
+                      FinTech · Data Engineering · Backend APIs · BI Analytics
+                    </span>
+                  </div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                    CreditVision — Financial Risk Analytics &amp; Data Processing
+                  </h2>
+                  <p className="text-xs text-slate-600 max-w-3xl">
+                    Explore the complete financial transaction cleaning pipeline, 5-table relational
+                    database schema, 5 live backend REST APIs, and interactive 10-KPI credit risk
+                    analytics dashboard.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('creditvision')}
+                    data-testid="open-creditvision-showcase-btn"
+                    className="px-4 py-2.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors inline-flex items-center gap-2 whitespace-nowrap cursor-pointer"
+                  >
+                    <LineChart className="w-3.5 h-3.5" />
+                    Open CreditVision Showcase
+                  </button>
+                </div>
+              </div>
+
               <ProblemSolutionVideo
                 onStartLiveDemo={handleStartGuidedDemo}
                 onOpenCopilot={() => setIsCopilotOpen(true)}
@@ -842,6 +895,10 @@ export default function App() {
                 onOpenCopilot={() => setIsCopilotOpen(true)}
               />
             </div>
+          )}
+
+          {activeTab === 'creditvision' && (
+            <CreditVisionView onShowToast={(msg) => showToast(msg)} />
           )}
 
           {activeTab === 'meetings' && (

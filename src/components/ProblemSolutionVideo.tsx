@@ -206,7 +206,7 @@ export const ProblemSolutionVideo: React.FC<ProblemSolutionVideoProps> = ({
   const playHumanizedChapterVoice = useCallback(
     async (chapter: VideoChapter, persona: VoicePersona) => {
       stopAllAudio();
-      const cacheKey = `${persona}:pwc:${chapter.id}`;
+      const cacheKey = `${persona}:enterprise:${chapter.id}`;
 
       const playWavBase64 = (base64: string) => {
         try {

@@ -55,7 +55,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
   const [ownerFilter, setOwnerFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'deadline' | 'priority' | 'status'>('deadline');
 
-  // Drag-and-Drop Kanban State & PwC Consulting Column Task Limits (WIP Capacity)
+  // Drag-and-Drop Kanban State & Enterprise Column Task Limits (WIP Capacity)
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<KanbanColumnId | null>(null);
   const [columnTaskLimits, setColumnTaskLimits] = useState<Record<KanbanColumnId, number>>({
@@ -634,13 +634,13 @@ export const TasksView: React.FC<TasksViewProps> = ({
           </div>
         </div>
       ) : (
-        /* VIEW MODE 2: Enterprise Kanban Board (Pending, In Progress, Completed with Drag-and-Drop & PwC Task Limit Counters) */
+        /* VIEW MODE 2: Enterprise Kanban Board (Pending, In Progress, Completed with Drag-and-Drop & Task Limit Counters) */
         <div className="space-y-4" data-testid="tasks-kanban-board">
-          {/* PwC Consulting Team Capacity & WIP Bottleneck Bar */}
+          {/* Enterprise Team Capacity & WIP Bottleneck Bar */}
           <div className="bg-white border border-slate-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
             <div className="flex items-center gap-2 text-slate-600">
               <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-mono font-semibold text-[11px]">
-                PwC Consulting WIP Controls
+                Enterprise Delivery WIP Controls
               </span>
               <span>
                 Drag and drop cards across <strong>Pending</strong>, <strong>In Progress</strong>, and{' '}
@@ -665,7 +665,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
                 {
                   id: 'pending' as KanbanColumnId,
                   label: 'Pending',
-                  roleContext: 'Backlog & Intake Queue (PwC Advisory / Legal)',
+                  roleContext: 'Backlog & Intake Queue (Product & Legal)',
                   subtitle: 'Queued & overdue action items awaiting active execution',
                   accent: 'border-t-4 border-t-amber-500',
                   badge: 'text-amber-800 bg-amber-50',

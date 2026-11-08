@@ -28,6 +28,12 @@ import {
 } from './src/core/engine';
 import { createInitialSeedState } from './src/core/seedData';
 import { AppDatabaseState, TaskStatus } from './src/core/types';
+import {
+  calculateCreditVisionKPIs,
+  createInitialCreditVisionDataset,
+  CreditVisionDataset,
+  validateAndIngestTransactionBatch,
+} from './src/core/creditVisionEngine';
 
 dotenv.config();
 
@@ -50,7 +56,9 @@ function ensureDbLoaded(): AppDatabaseState {
         parsed &&
         Array.isArray(parsed.meetings) &&
         Array.isArray(parsed.tasks) &&
-        parsed.scenarioName?.includes('PwC India')
+        Array.isArray(parsed.participants) &&
+        parsed.participants.some((p) => p.name === 'Sopan Shinde') &&
+        parsed.scenarioName?.includes('CreditVision')
       ) {
         if (!Array.isArray(parsed.processingHistory)) {
           parsed.processingHistory = createInitialSeedState().processingHistory;
@@ -78,6 +86,7 @@ function saveDbState(state: AppDatabaseState): void {
 }
 
 let dbState: AppDatabaseState = ensureDbLoaded();
+let creditVisionState: CreditVisionDataset = createInitialCreditVisionDataset();
 
 function getGeminiClient(): GoogleGenAI | null {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -259,6 +268,63 @@ export function createApiApp() {
 
   app.get('/api/data-quality', (_req, res) => {
     res.json(evaluateWorkspaceDataQuality(dbState));
+  });
+
+  // 4b. CreditVision — Financial Risk Analytics & Data Processing Endpoints (5 Verified Endpoints)
+  app.get('/api/creditvision/overview', (_req, res) => {
+    res.json({
+      projectTitle: creditVisionState.projectTitle,
+      subtitle: creditVisionState.subtitle,
+      kpis: calculateCreditVisionKPIs(creditVisionState),
+      tablesCount: 5,
+      tables: [
+        'customers',
+        'credit_accounts',
+        'transactions',
+        'risk_assessments',
+        'validation_audit_logs',
+      ],
+      dataset: creditVisionState,
+    });
+  });
+
+  app.get('/api/creditvision/kpis', (_req, res) => {
+    res.json(calculateCreditVisionKPIs(creditVisionState));
+  });
+
+  app.get('/api/creditvision/transactions', (req, res) => {
+    const riskTier = typeof req.query.riskTier === 'string' ? req.query.riskTier : 'all';
+    const segment = typeof req.query.segment === 'string' ? req.query.segment : 'all';
+    const filtered = creditVisionState.transactions.filter((t) => {
+      if (riskTier !== 'all' && t.riskTier !== riskTier) return false;
+      if (segment !== 'all' && t.segment !== segment) return false;
+      return true;
+    });
+    res.json({
+      count: filtered.length,
+      transactions: filtered,
+    });
+  });
+
+  app.get('/api/creditvision/risk-summary', (_req, res) => {
+    res.json({
+      riskTierBreakdown: creditVisionState.riskTierBreakdown,
+      monthlyRiskTrends: creditVisionState.monthlyRiskTrends,
+      riskAssessments: creditVisionState.riskAssessments,
+      validationAuditLogs: creditVisionState.validationAuditLogs,
+    });
+  });
+
+  app.post('/api/creditvision/validate-batch', (req, res) => {
+    const rawTransactions = Array.isArray(req.body?.transactions) ? req.body.transactions : [];
+    const result = validateAndIngestTransactionBatch(creditVisionState, rawTransactions);
+    creditVisionState = result.updatedDataset;
+    res.status(201).json({
+      batchSummary: result.batchSummary,
+      processedTransactions: result.processedTransactions,
+      kpis: calculateCreditVisionKPIs(creditVisionState),
+      dataset: creditVisionState,
+    });
   });
 
   // 5. AI Meeting Assistant — Structured Extraction via Gemini
@@ -714,14 +780,14 @@ CRITICAL RULES:
         const response = await withTimeout(
           ai.models.generateContent({
             model: 'gemini-3.8-flash',
-            contents: `Live PwC India Business AI Workspace State:\n${JSON.stringify(
+            contents: `Live Enterprise FinTech & AI Workspace State:\n${JSON.stringify(
               workspaceSnapshot,
               null,
               2
             )}\n\nUser Question: ${cleanMsg}`,
             config: {
               systemInstruction:
-                'You are the SyncMind Business AI Copilot for PwC India (supporting Ananya Sharma in Gurugram, Rohan Deshmukh in Bengaluru, and Priya Nair in Mumbai). Answer the user question concisely (2-5 bullet points or 2 short paragraphs) using exact facts, task owners, deadlines, decisions, and blockers from the provided live workspace state. Remind the user they can also ask you to mark tasks complete, carry forward overdue tasks into Part 2, or create new action items.',
+                'You are the SyncMind & CreditVision Enterprise AI Copilot (supporting Ananya Sharma in Gurugram, Rohan Deshmukh in Bengaluru, and Priya Nair in Mumbai). Answer the user question concisely (2-5 bullet points or 2 short paragraphs) using exact facts, task owners, deadlines, decisions, and blockers from the provided live workspace state. Remind the user they can also ask you to mark tasks complete, carry forward overdue tasks into Part 2, or create new action items.',
               thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
             },
           }),

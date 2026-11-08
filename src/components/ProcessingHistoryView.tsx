@@ -56,7 +56,7 @@ export const ProcessingHistoryView: React.FC<ProcessingHistoryViewProps> = ({
       <div className="bg-white border border-slate-200 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
         <div>
           <span className="text-xs font-mono uppercase tracking-wider text-indigo-600 font-semibold">
-            PwC Data Engineering Associate · Pipeline Audit &amp; Data Quality
+            Enterprise Data Engineering · Pipeline Audit &amp; Data Quality
           </span>
           <h2 className="text-lg font-bold text-slate-900 mt-0.5">
             Data Processing History, Schema Validation &amp; Referential Integrity
@@ -500,15 +500,15 @@ export const ProcessingHistoryView: React.FC<ProcessingHistoryViewProps> = ({
         </div>
       </div>
 
-      {/* PwC Data Engineering Associate JD Alignment Matrix */}
+      {/* Enterprise Data Engineering & Analytics Competency Matrix */}
       <div
         className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4"
-        data-testid="pwc-jd-alignment-matrix"
+        data-testid="data-engineering-competency-matrix"
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <span className="text-[11px] font-mono uppercase tracking-wider text-indigo-600 font-semibold">
-              Role Verification · PwC Data Engineering Associate
+              Architecture Verification · Data Engineering &amp; Backend Systems
             </span>
             <h3 className="text-sm font-bold text-slate-900 mt-0.5 flex items-center gap-2">
               <Database className="w-4 h-4 text-indigo-600" />
